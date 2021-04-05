@@ -1,0 +1,6 @@
+**/__pycache__
+*.ipynb_checkpoints
+**/data/tmp
+*/data
+data/input_data/daks_processed_no_nan.csv
+data/input_data/daks_processed.csv
