@@ -16,7 +16,6 @@ def loc_to_DataFrame(data: np.array):
         data (pd.DataFrame): with string columns for filtering
     """
     nodes_type = get_type_numpy(data)
-    arr = data.T
     dtype = dict()
     for key, value in nodes_type.items():
         if value == 'disc':
