@@ -7,7 +7,7 @@ import math
 from typing import List
 import numpy as np
 import pandas as pd
-from pyBN.utils.independence_tests import mutual_information
+from external.pyBN.utils.independence_tests import mutual_information
 from preprocess.discretization import get_nodes_type
 from preprocess.numpy_pandas import loc_to_DataFrame
     
