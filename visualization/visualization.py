@@ -143,4 +143,4 @@ def draw_BN(bn1: dict, node_type: dict, name: str):
     plt.close()
     
     network.show_buttons(filter_=['physics'])
-    return network.show(f'visualization_result/'+ name + '.html')
+    return network.show(f'../visualization_result/'+ name + '.html')
