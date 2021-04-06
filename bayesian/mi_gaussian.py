@@ -8,8 +8,8 @@ from typing import List
 import numpy as np
 import pandas as pd
 from pyBN.utils.independence_tests import mutual_information
-from preprocess.discretization import get_nodes_type, code_categories
-from preprocess.numpy_pandas import loc_to_DataFrame, get_type_numpy
+from preprocess.discretization import get_nodes_type
+from preprocess.numpy_pandas import loc_to_DataFrame
     
 def query_filter(data: pd.DataFrame, columns: List, values: List):
     """
@@ -144,28 +144,4 @@ def mi_gauss(data, conditional=False):
                 else:
                     H_cond = 0.0
                 return(H_gauss-H_cond)
-    
-
-
-            
-    
-
-if __name__ == "__main__":
-    data = pd.read_csv('./data/input_data/daks_processed.csv')
-    #columns = ['Period', 'Tectonic regime', 'Hydrocarbon type']
-    #columns = ['Gross', 'Netpay','Porosity']
-    columns = ['Gross', 'Netpay', 'Period']
-    data_test = data[columns]
-
-    node_type = get_nodes_type(data_test)
-    columns_for_discrete = []
-    for param in columns:
-        if node_type[param] == 'cont':
-            columns_for_discrete.append(param)
-    columns_for_code = []
-    for param in columns:
-        if node_type[param] == 'disc':
-            columns_for_code.append(param)        
-
-    data_coded, code_dict = code_categories(data_test, "label", columns_for_code)
-    print(mi_gauss(data_coded.values))
+                
