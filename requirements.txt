@@ -8,6 +8,7 @@ scikit-learn==0.23.1
 seaborn==0.10.1
 pomegranate==0.13.4
 #pip install torch===1.5.0 torchvision===0.6.0 -f https://download.pytorch.org/whl/torch_stable.html
+#pip3 install Cython
 #pip install git+https://github.com/ncullen93/pyBN.git
 #pip install git+https://github.com/CyberPoint/libpgm
 pgmpy==0.1.13

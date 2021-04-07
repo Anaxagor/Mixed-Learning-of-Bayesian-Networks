@@ -22,11 +22,10 @@ class MIG(StructureScore):
     def local_score(self, variable, parents):
         """'Computes a score that measures how much a \
         given variable is "influenced" by a given list of potential parents.'"""
-
+        nrow = len(self.data)
         list_var = [variable]
-        list_var.extend(parents)
-        
-        score = mi_gauss(self.data[list_var])
+        list_var.extend(parents)       
+        score = - nrow * mi_gauss(self.data[list_var])
 
         return score
 
