@@ -144,4 +144,3 @@ def mi_gauss(data, conditional=False):
                 else:
                     H_cond = 0.0
                 return(H_gauss-H_cond)
-                
