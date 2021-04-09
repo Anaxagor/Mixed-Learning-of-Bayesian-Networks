@@ -2,7 +2,7 @@ import os,sys,inspect
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
-from bayesian.mi_gaussian import mi_gauss
+from bayesian.mi_entropy_gauss import mi_gauss
 from pgmpy.estimators.StructureScore import StructureScore
 
 class MIG(StructureScore):
