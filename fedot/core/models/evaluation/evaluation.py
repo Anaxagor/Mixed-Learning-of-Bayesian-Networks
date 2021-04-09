@@ -80,7 +80,7 @@ class EvaluationStrategy:
 
     @abstractmethod
     def fit_tuned(self, train_data: InputData, iterations: int,
-                  max_lead_time: timedelta = timedelta(minutes=5)):
+                  max_lead_time:timedelta):
         """
         Main method used for hyperparameter searching
 
@@ -172,7 +172,7 @@ class SkLearnEvaluationStrategy(EvaluationStrategy):
         raise NotImplementedError()
 
     def fit_tuned(self, train_data: InputData, iterations: int,
-                  max_lead_time: timedelta = timedelta(minutes=5)):
+                  max_lead_time:timedelta):
         """
         This method is used for hyperparameter searching
 
@@ -275,8 +275,8 @@ class SkLearnClusteringStrategy(SkLearnEvaluationStrategy):
         prediction = trained_model.predict(predict_data.features)
         return prediction
 
-    def fit_tuned(self, train_data: InputData, iterations: int = 30,
-                  max_lead_time: timedelta = timedelta(minutes=5)):
+    def fit_tuned(self, train_data: InputData,
+                  max_lead_time: timedelta, iterations: int = 30):
         """
         This method is used for hyperparameter searching
 

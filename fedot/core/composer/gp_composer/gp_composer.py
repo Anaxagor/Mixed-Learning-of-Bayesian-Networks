@@ -108,15 +108,18 @@ class GPComposer(Composer):
         if not self.optimiser:
             raise AttributeError(f'Optimiser for chain composition is not defined')
 
-        train_data, test_data = train_test_data_setup(data,
-                                                      sample_split_ration_for_tasks[data.task.task_type],
-                                                      task=data.task)
+        train_data = data
+        test_data = data
+        # = train_test_data_setup(data,
+        #                                               sample_split_ration_for_tasks[data.task.task_type],
+        #                                               task=data.task)
         if self.cache_path is None:
             self.cache.clear()
         else:
             self.cache = ModelsCache(self.cache_path, clear_exiting=not self.use_existing_cache)
 
         metric_function_for_nodes = partial(self.composer_metric, self.metrics, train_data, test_data)
+        print('start optimise')
 
         best_chain = self.optimiser.optimise(metric_function_for_nodes,
                                              on_next_iteration_callback=on_next_iteration_callback)
@@ -136,12 +139,12 @@ class GPComposer(Composer):
             if type(metrics) is not list:
                 metrics = [metrics]
 
-            if self.cache is not None:
-                chain.fit_from_cache(self.cache)
+            #if self.cache is not None:
+            #    chain.fit_from_cache(self.cache)
 
-            if not chain.is_fitted():
-                chain.fit(input_data=train_data, time_constraint=self.composer_requirements.max_chain_fit_time)
-                self.cache.save_chain(chain)
+            #if not chain.is_fitted():
+            #    chain.fit(input_data=train_data, time_constraint=self.composer_requirements.max_chain_fit_time)
+            #    self.cache.save_chain(chain)
 
             evaluated_metrics = ()
             for metric in metrics:
@@ -190,7 +193,7 @@ class GPComposerBuilder:
 
     def with_requirements(self, requirements: GPComposerRequirements):
         # TODO move this functionality in composer
-        requirements.secondary = list(filter(self.can_be_secondary_requirement, requirements.secondary))
+        #requirements.secondary = list(filter(self.can_be_secondary_requirement, requirements.secondary))
         self._composer.composer_requirements = requirements
         return self
 

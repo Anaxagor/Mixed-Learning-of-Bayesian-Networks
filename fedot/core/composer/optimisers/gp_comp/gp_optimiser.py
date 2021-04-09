@@ -124,11 +124,13 @@ class GPChainOptimiser:
                  on_next_iteration_callback: Optional[Callable] = None):
         if on_next_iteration_callback is None:
             on_next_iteration_callback = self.default_on_next_iteration_callback
-
+        print('done')
+   
         if self.population is None:
             self.population = self._make_population(self.requirements.pop_size)
 
         num_of_new_individuals = self.offspring_size(offspring_rate)
+        
 
         with CompositionTimer(log=self.log, max_lead_time=self.requirements.max_lead_time) as t:
 

@@ -14,12 +14,55 @@ ERROR_PREFIX = 'Invalid chain configuration:'
 
 def validate(chain: Chain, task: Optional[Task] = None):
     # TODO pass task to this function
-    has_one_root(chain)
+    #has_one_root(chain)
     has_no_cycle(chain)
     has_no_self_cycled_nodes(chain)
-    has_no_isolated_nodes(chain)
-    has_primary_nodes(chain)
-    has_correct_model_positions(chain, task)
+    has_no_duplicates(chain)
+    has_disc_parents(chain)
+    #has_all_nodes(chain)
+    #has_no_isolated_nodes(chain)
+    #has_primary_nodes(chain)
+#    has_correct_model_positions(chain, task)
+    return True
+
+def has_no_duplicates(chain: Chain):
+    graph, labels = chain_as_nx_graph(chain)
+    list_of_nodes = []
+    for node in labels.values():
+        list_of_nodes.append(str(node))
+    if len(list_of_nodes) != len(set(list_of_nodes)):
+        raise ValueError(f'{ERROR_PREFIX} Chain has duplicates')
+    return True
+     
+def has_disc_parents(chain: Chain):
+    node_types = {'Tectonic regime': 'disc',
+    'Period': 'disc',
+    'Lithology': 'disc',
+    'Structural setting': 'disc',
+    'Hydrocarbon type': 'disc',
+    'Gross': 'cont',
+    'Netpay': 'cont',
+    'Porosity': 'cont',
+    'Permeability': 'cont',
+    'Depth': 'cont'}
+    graph, labels = chain_as_nx_graph(chain)
+    for pair in graph.edges():
+        if (node_types[str(labels[pair[1]])] == 'disc') & (node_types[str(labels[pair[0]])] == 'cont'):
+            raise ValueError(f'{ERROR_PREFIX} Discrete node has cont parent')
+    return True
+        
+        
+
+
+def has_all_nodes(chain: Chain):
+    nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
+    graph, labels = chain_as_nx_graph(chain)
+    list_of_nodes = []
+    for node in labels.values():
+        list_of_nodes.append(str(node))
+    for node in nodes:
+        if node not in list_of_nodes:
+            raise ValueError(f'{ERROR_PREFIX} Chain has not all nodes')
     return True
 
 
@@ -30,6 +73,16 @@ def has_one_root(chain: Chain):
 
 def has_no_cycle(chain: Chain):
     graph, _ = chain_as_nx_graph(chain)
+    # struct = []
+    # for pair in graph.edges():
+    #     struct.append((str(labels[pair[0]]), str(labels[pair[1]])))
+    # G = nx.DiGraph(struct)
+    # try:
+    #     nx.find_cycle(G)
+    #     raise ValueError(f'{ERROR_PREFIX} Chain has cycles')
+    # except:
+    #     return True
+    
     cycled = list(simple_cycles(graph))
     if len(cycled) > 0:
         raise ValueError(f'{ERROR_PREFIX} Chain has cycles')
