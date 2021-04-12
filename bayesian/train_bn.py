@@ -9,18 +9,20 @@ from pgmpy.estimators import K2Score
 from pomegranate import DiscreteDistribution, ConditionalProbabilityTable
 from scipy.stats import norm
 from sklearn import linear_model
+from bayesian.structure_score import MIG
 
 from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
 
 
-def structure_learning(data: pd.DataFrame, algorithm: str, node_type: dict, init_nodes: list = None,
+def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: dict, init_nodes: list = None,
                        white_list: list = None,
                        init_edges: list = None, remove_init_edges: bool = True, black_list: list = None) -> dict:
     """Function for bayesian networks structure learning
 
     Args:
         data (pd.DataFrame): input encoded and discretized data
-        algorithm (str): algorith of learning (K2, MI)
+        search (str): search strategy (HC, evo)
+        score (str): algorith of learning (K2, MI, MI_mixed)
         node_type (dict): dictionary with node types (discrete or continuous)
         init_nodes (list, optional): nodes with no parents. Defaults to None.
         white_list (list, optional): allowable edges. Defaults to None.
@@ -46,47 +48,62 @@ def structure_learning(data: pd.DataFrame, algorithm: str, node_type: dict, init
     skeleton = dict()
     skeleton['V'] = datacol
 
-    if algorithm == "MI":
-        column_name_dict = dict([(n, i) for i, n in enumerate(datacol)])
-        blacklist_new = []
-        for pair in blacklist:
-            blacklist_new.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-        if white_list:
-            white_list_old = copy(white_list)
-            white_list = []
-            for pair in white_list_old:
-                white_list.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-        if init_edges:
-            init_edges_old = copy(init_edges)
-            init_edges = []
-            for pair in init_edges_old:
-                init_edges.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-        bn = hc_method(data.values, restriction=white_list, init_edges=init_edges,
-                       remove_geo_edges=remove_init_edges, black_list=blacklist_new)
-        structure = []
-        nodes = sorted(list(bn.nodes()))
-        for rv in nodes:
-            for pa in bn.F[rv]['parents']:
-                structure.append([list(column_name_dict.keys())[list(column_name_dict.values()).index(pa)],
+    if search == 'HC':
+        if score == "MI":
+            column_name_dict = dict([(n, i) for i, n in enumerate(datacol)])
+            blacklist_new = []
+            for pair in blacklist:
+                blacklist_new.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
+            if white_list:
+                white_list_old = copy(white_list)
+                white_list = []
+                for pair in white_list_old:
+                    white_list.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
+            if init_edges:
+                init_edges_old = copy(init_edges)
+                init_edges = []
+                for pair in init_edges_old:
+                    init_edges.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
+            bn = hc_method(data.values, restriction=white_list, init_edges=init_edges, remove_geo_edges=remove_init_edges, black_list=blacklist_new)
+            structure = []
+            nodes = sorted(list(bn.nodes()))
+            for rv in nodes:
+                for pa in bn.F[rv]['parents']:
+                    structure.append([list(column_name_dict.keys())[list(column_name_dict.values()).index(pa)],
                                   list(column_name_dict.keys())[list(column_name_dict.values()).index(rv)]])
-        skeleton['E'] = structure
-    if algorithm == "K2":
-        hc_K2Score = HillClimbSearch(data, scoring_method=K2Score(data))
-        if init_edges == None:
-            best_model_K2Score = hc_K2Score.estimate(black_list=blacklist, white_list=white_list)
-        else:
-            if remove_init_edges:
-                startdag = DAG()
-                startdag.add_nodes_from(nodes=datacol)
-                startdag.add_edges_from(ebunch=init_edges)
-                best_model_K2Score = hc_K2Score.estimate(black_list=blacklist, white_list=white_list,
-                                                         start_dag=startdag)
+            skeleton['E'] = structure
+        if score == "K2":
+            hc_K2Score = HillClimbSearch(data, scoring_method=K2Score(data))
+            if init_edges == None:
+                best_model_K2Score = hc_K2Score.estimate(black_list=blacklist, white_list=white_list)
             else:
-                best_model_K2Score = hc_K2Score.estimate(black_list=blacklist, white_list=white_list,
+                if remove_init_edges:
+                    startdag = DAG()
+                    startdag.add_nodes_from(nodes=datacol)
+                    startdag.add_edges_from(ebunch=init_edges)
+                    best_model_K2Score = hc_K2Score.estimate(black_list=blacklist, white_list=white_list,
+                                                         start_dag=startdag)
+                else:
+                    best_model_K2Score = hc_K2Score.estimate(black_list=blacklist, white_list=white_list,
                                                          fixed_edges=init_edges)
-        structure = [list(x) for x in list(best_model_K2Score.edges())]
-        skeleton['E'] = structure
-
+            structure = [list(x) for x in list(best_model_K2Score.edges())]
+            skeleton['E'] = structure
+        if score == 'MI_mixed':
+            hc_mi_mixed = HillClimbSearch(data, scoring_method=MIG(data=data))
+            if init_edges == None:
+                best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list)
+            else:
+                if remove_init_edges:
+                    startdag = DAG()
+                    startdag.add_nodes_from(nodes=datacol)
+                    startdag.add_edges_from(ebunch=init_edges)
+                    best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list,
+                                                         start_dag=startdag)
+                else:
+                    best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list,
+                                                         fixed_edges=init_edges)
+            structure = [list(x) for x in list(best_model_mi_mixed.edges())]
+            skeleton['E'] = structure
     return skeleton
 
 
