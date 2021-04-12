@@ -33,7 +33,7 @@ from fedot.core.repository.quality_metrics_repository import ClassificationMetri
 from fedot.core.repository.tasks import Task, TaskTypesEnum
 from fedot.core.utils import project_root
 from pgmpy.estimators import K2Score
-
+from bayesian.mi_entropy_gauss import mi
 
 
 
@@ -57,7 +57,17 @@ def K2(chain: Chain, reference_data: pd.DataFrame) -> float:
     return score
 
 
-def run_BN_evo(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
+def MI(chain: Chain, reference_data: pd.DataFrame) -> float:
+    nodes = reference_data.columns.to_list()
+    graph, labels = chain_as_nx_graph(chain)
+    struct = []
+    for pair in graph.edges():
+        struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+    score = mi(struct, reference_data)
+    return score
+
+
+def run_BN_evo_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
     available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
     composer_requirements = GPComposerRequirements(
             primary=available_nodes,
@@ -68,6 +78,22 @@ def run_BN_evo(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.
     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
     task = Task(TaskTypesEnum.regression)
     builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(K2).with_optimiser_parameters(optimiser_parameters)
+    composer = builder.build()
+    chain_evo_composed = composer.compose_chain(data=data)
+    return chain_evo_composed
+
+
+def run_BN_evo_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
+    available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
+    composer_requirements = GPComposerRequirements(
+            primary=available_nodes,
+            secondary=available_nodes, max_arity=6,
+            max_depth=3, pop_size=20, num_of_generations=50,
+            crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
+    scheme_type = GeneticSchemeTypesEnum.steady_state
+    optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
+    task = Task(TaskTypesEnum.regression)
+    builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(MI).with_optimiser_parameters(optimiser_parameters)
     composer = builder.build()
     chain_evo_composed = composer.compose_chain(data=data)
     return chain_evo_composed
@@ -169,53 +195,23 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
             structure = [list(x) for x in list(best_model_mi_mixed.edges())]
             skeleton['E'] = structure
     if search == 'evo':
-        # if score == "MI":
-        #     column_name_dict = dict([(n, i) for i, n in enumerate(datacol)])
-        #     blacklist_new = []
-        #     for pair in blacklist:
-        #         blacklist_new.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-        #     if white_list:
-        #         white_list_old = copy(white_list)
-        #         white_list = []
-        #         for pair in white_list_old:
-        #             white_list.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-        #     if init_edges:
-        #         init_edges_old = copy(init_edges)
-        #         init_edges = []
-        #         for pair in init_edges_old:
-        #             init_edges.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-        #     bn = hc_method(data.values, restriction=white_list, init_edges=init_edges, remove_geo_edges=remove_init_edges, black_list=blacklist_new)
-        #     structure = []
-        #     nodes = sorted(list(bn.nodes()))
-        #     for rv in nodes:
-        #         for pa in bn.F[rv]['parents']:
-        #             structure.append([list(column_name_dict.keys())[list(column_name_dict.values()).index(pa)],
-        #                           list(column_name_dict.keys())[list(column_name_dict.values()).index(rv)]])
-        #     skeleton['E'] = structure
+
+        if score == "MI":
+            chain = run_BN_evo_MI(data)
+            graph, labels = chain_as_nx_graph(chain)
+            struct = []
+            for pair in graph.edges():
+                struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+            skeleton['E'] = struct
+       
         if score == "K2":
-            chain = run_BN_evo(data)
+            chain = run_BN_evo_K2(data)
             graph, labels = chain_as_nx_graph(chain)
             struct = []
             for pair in graph.edges():
                 struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
             skeleton['E'] = struct
 
-        # if score == 'MI_mixed':
-        #     hc_mi_mixed = HillClimbSearch(data, scoring_method=MIG(data=data))
-        #     if init_edges == None:
-        #         best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list)
-        #     else:
-        #         if remove_init_edges:
-        #             startdag = DAG()
-        #             startdag.add_nodes_from(nodes=datacol)
-        #             startdag.add_edges_from(ebunch=init_edges)
-        #             best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list,
-        #                                                  start_dag=startdag)
-        #         else:
-        #             best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list,
-        #                                                  fixed_edges=init_edges)
-        #     structure = [list(x) for x in list(best_model_mi_mixed.edges())]
-        #     skeleton['E'] = structure
     return skeleton
 
 

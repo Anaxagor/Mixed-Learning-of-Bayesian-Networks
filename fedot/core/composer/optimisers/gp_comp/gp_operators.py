@@ -70,7 +70,7 @@ def random_chain(chain_generation_params, requirements, max_depth=None) -> Any:
         chain.add_node(chain_root)
         chain_growth(chain, chain_root)
         is_correct_chain = constraint_function(chain)
-        print(chain)
+        
     return chain
 
 
