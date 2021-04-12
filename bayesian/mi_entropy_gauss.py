@@ -10,8 +10,10 @@ import pandas as pd
 from external.pyBN.utils.independence_tests import mutual_information, entropy
 from preprocess.discretization import get_nodes_type
 from preprocess.numpy_pandas import loc_to_DataFrame
+from preprocess.graph import edges_to_dict, nodes_from_edges
 
 from preprocess.discretization import get_nodes_type, code_categories
+
 
     
 def query_filter(data: pd.DataFrame, columns: List, values: List):
@@ -41,12 +43,12 @@ def query_filter(data: pd.DataFrame, columns: List, values: List):
         return data_trim
 
 
-def entropy_gauss(data):
+def entropy_gauss(pd_data):
     """
     Calculate entropy for Gaussian multivariate distributions.
             Arguments
     ----------
-    *data* : numpy array
+    *data* : pd.DataFrame
 
     Returns
     -------
@@ -57,8 +59,11 @@ def entropy_gauss(data):
     -------
     None
     """
-    
-    if (data.ndim == 1) | (copy(data).T.ndim == 1):
+    if not isinstance(pd_data, pd.Series):
+        data = copy(pd_data).values.T 
+    else:
+        data = np.array(copy(pd_data)).T
+    if (data.ndim == 1) | (copy(data).T.ndim == 1)|(len(data[0]) == 1)|(len(data.T[0]) == 1):
         var = np.var(data)
         if var > 1e-7:
             return 0.5 * (1 + math.log(var))
@@ -95,7 +100,9 @@ def entropy_all(data):
     *H* : entropy value"""
     if type(data) is np.ndarray:
         return entropy_all(loc_to_DataFrame(data))
-    elif type(data) is pd.DataFrame:
+    elif isinstance(data, pd.Series):
+        return(entropy_all(pd.DataFrame(data)))
+    elif (type(data) is pd.DataFrame):
         nodes_type = get_nodes_type(data)
         column_disc = []
         for key in nodes_type:
@@ -111,8 +118,8 @@ def entropy_all(data):
         if len(column_cont) == 0:
                 return(entropy(data_disc.values))
         elif len(column_disc) == 0:
-            return entropy_gauss(data_cont.values.T)
-        else:
+            return entropy_gauss(data_cont)
+        else:      
             H_disc = entropy(data_disc.values)
             dict_comb = {}
             comb_prob = {}
@@ -131,7 +138,7 @@ def entropy_all(data):
             for key in list(dict_comb.keys()):
                 filtered_data = query_filter(data, column_disc, list(dict_comb[key]))
                 filtered_data = filtered_data[column_cont]
-                H_cond += comb_prob[key] * entropy_gauss(filtered_data.values.T)
+                H_cond += comb_prob[key] * entropy_gauss(filtered_data)
 
             return(H_disc + H_cond)
 
@@ -160,6 +167,8 @@ def mi_gauss(data, conditional=False):
     """
     if type(data) is np.ndarray:
         return mi_gauss(loc_to_DataFrame(data), conditional)
+    elif isinstance(data, pd.Series):
+        return(mi_gauss(pd.DataFrame(data)))
     elif type(data) is pd.DataFrame:
         nodes_type = get_nodes_type(data)
         if conditional:
@@ -188,16 +197,16 @@ def mi_gauss(data, conditional=False):
                 return(mutual_information(data_disc.values,conditional = False))
             elif len(column_disc) == 0:
                 if len(column_cont) == 1:
-                    return entropy_gauss(data_cont.values.T)
+                    return entropy_gauss(data_cont)
                 else:
                     data_one = data_cont[column_cont[0]]
                     column_cont_trim = copy(column_cont)
                     del column_cont_trim[0]
                     data_cont_trim = data[column_cont_trim]
-                    H_gauss = entropy_gauss(data_one.values.T)+entropy_gauss(data_cont_trim.values.T)-entropy_gauss(data_cont.values.T)
+                    H_gauss = entropy_gauss(data_one)+entropy_gauss(data_cont_trim)-entropy_gauss(data_cont)
                     H_cond = 0.0
             else:
-                H_gauss = entropy_gauss(data_cont.values.T)
+                H_gauss = entropy_gauss(data_cont)
                 
                 dict_comb = {}
                 comb_prob = {}
@@ -216,9 +225,38 @@ def mi_gauss(data, conditional=False):
                 for key in list(dict_comb.keys()):
                     filtered_data = query_filter(data, column_disc, list(dict_comb[key]))
                     filtered_data = filtered_data[column_cont]
-                    H_cond += comb_prob[key] * entropy_gauss(filtered_data.values.T)
+                    H_cond += comb_prob[key] * entropy_gauss(filtered_data)
                 
             return(H_gauss-H_cond)
+
+def mi(edges: list, data: pd.DataFrame):
+    """
+    Bypasses all nodes and summarizes scores, 
+    taking into account the parent-child relationship.
+            Arguments
+    ----------
+    *edges* : list
+    *data* : pd.DataFrame
+
+    Returns
+    -------
+    *sum_score* : float
+
+    Effects
+    -------
+    None
+    """
+    parents_dict = edges_to_dict(edges)
+    sum_score = 0.0
+    nodes_with_edges = parents_dict.keys()
+    for var in nodes_with_edges:
+        child_parents = [var]
+        child_parents.extend(parents_dict[var])
+        sum_score += mi_gauss(copy(data[child_parents]))
+    nodes_without_edges = list(set(data.columns).difference(set(nodes_with_edges)))
+    for var in nodes_without_edges:
+        sum_score += mi_gauss(copy(data[var]))
+    return sum_score
 
 
 if __name__ == '__main__':
@@ -226,8 +264,10 @@ if __name__ == '__main__':
     data.dropna(inplace=True)
     data.reset_index(inplace=True, drop=True)
     #columns = ['Period', 'Tectonic regime', 'Hydrocarbon type']
-    columns = ['Gross', 'Netpay','Porosity']
+    #columns = ['Gross', 'Netpay','Porosity']
     #columns = ['Gross', 'Netpay', 'Period']
+    #columns = data.columns
+    columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
     data_test = data[columns]
 
     node_type = get_nodes_type(data_test)
@@ -246,3 +286,9 @@ if __name__ == '__main__':
     print(mi_gauss(data_coded.values))
     print(entropy_all(data_coded))
     print(entropy_all(data_coded.values))
+
+    edges = [('Netpay', 'Structural setting'), 
+    ('Porosity', 'Hydrocarbon type')]
+
+    print(mi(edges, data_coded[nodes_from_edges(edges)]))
+    print(mi(edges, data_coded))
