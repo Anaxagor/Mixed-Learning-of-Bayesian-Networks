@@ -1,11 +1,11 @@
-numpy==1.19.1
+numpy==1.19.2
 graphviz==0.16
 #ipywidgets==7.5.1
 #networkx==2.4
 pandas==1.1.0
 #pyvis==0.1.8.2
-scikit-learn==0.23.1
-seaborn==0.10.1
+scikit-learn==0.24.1
+seaborn==0.9.0
 pomegranate==0.13.4
 #pip install torch===1.5.0 torchvision===0.6.0 -f https://download.pytorch.org/whl/torch_stable.html
 #pip3 install Cython
@@ -19,3 +19,4 @@ bnlearn==0.3.7
 #gower==0.0.5
 #distython==0.0.3
 #matplotlib==3.0.1
+https://github.com/nccr-itmo/FEDOT/archive/features/custom-task-example.zip
