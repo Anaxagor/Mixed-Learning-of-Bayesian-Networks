@@ -23,6 +23,7 @@ from fedot.core.repository.quality_metrics_repository import ClassificationMetri
 from fedot.core.repository.tasks import Task, TaskTypesEnum
 from fedot.core.utils import project_root
 from pgmpy.estimators import K2Score
+from bayesian.mi_entropy_gauss import mi
 
 random.seed(1)
 np.random.seed(1)
@@ -40,6 +41,16 @@ def K2(chain: Chain, reference_data: pd.DataFrame) -> float:
             no_nodes.append(node)
     
     score = K2Score(reference_data).score(BN_model) #+ 1000*len(no_nodes)
+    return score
+
+
+def MI(chain: Chain, reference_data: pd.DataFrame) -> float:
+    nodes = reference_data.columns.to_list()
+    graph, labels = chain_as_nx_graph(chain)
+    struct = []
+    for pair in graph.edges():
+        struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+    score = mi(struct, reference_data)
     return score
 
 def run_credit_scoring_problem(max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False):

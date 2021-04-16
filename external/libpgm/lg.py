@@ -28,7 +28,8 @@ This module contains tools for representing linear Gaussian nodes -- those with 
 '''
 import random
 import math
-
+from scipy.spatial import distance
+import numpy as np
 class Lg():
     '''
     This class represents a linear Gaussian node, as described above. It contains the *Vdataentry* attribute and the *choose* method.
@@ -56,14 +57,11 @@ class Lg():
     def choose(self, pvalues, outcome):
         '''
         Randomly choose state of node from probability distribution conditioned on *pvalues*.
-
         This method has two parts: (1) determining the proper probability
         distribution, and (2) using that probability distribution to determine
         an outcome.
-
         Arguments:
             1. *pvalues* -- An array containing the assigned states of the node's parents. This must be in the same order as the parents appear in ``self.Vdataentry['parents']``.
-
         The function creates a Gaussian distribution in the manner described in :doc:`lgbayesiannetwork`, and samples from that distribution, returning its outcome.
         
         '''
@@ -83,4 +81,98 @@ class Lg():
         # draw random outcome from Gaussian
         # note that this built in function takes the standard deviation, not the
         # variance, thus requiring a square root
-        return random.gauss(mean, math.sqrt(variance))          
+        return random.gauss(mean, math.sqrt(variance))      
+
+    def choose_mix(self, pvalues, outcome):
+        '''
+        Randomly choose state of node from probability distribution conditioned on *pvalues*.
+
+        This method has two parts: (1) determining the proper probability
+        distribution, and (2) using that probability distribution to determine
+        an outcome.
+
+        Arguments:
+            1. *pvalues* -- An array containing the assigned states of the node's parents. This must be in the same order as the parents appear in ``self.Vdataentry['parents']``.
+
+        The function creates a Gaussian distribution in the manner described in :doc:`lgbayesiannetwork`, and samples from that distribution, returning its outcome.
+        
+        '''
+        random.seed()
+
+        # calculate Bayesian parameters (mean and variance)
+        #mean = self.Vdataentry["mean_base"]
+        # mean_node = 0
+        # mean_node = 1
+        mean = self.Vdataentry["mean_base"]
+        variance = self.Vdataentry["variance"]
+        parents = []
+        parents_mean = []
+        if isinstance(mean, list):
+            if (self.Vdataentry["parents"] != None):
+                for x in range(len(self.Vdataentry["parents"])):
+                    if (pvalues[x] != "default"):
+                        parents.append(pvalues[x])
+                        parents_mean.append(self.Vdataentry["mean_scal"][x])
+                    else:
+                        print ("Attempted to sample node with unassigned parents.")
+                if len(parents) == 1:
+                    if str(parents[0]) != 'nan':
+                        dists = []
+                        for vector in parents_mean:
+                            dists.append(distance.euclidean(parents, vector))
+                        label = dists.index(min(dists))
+                        mean_node = mean[label]
+                        variance_node = variance[label]
+                    else:
+                        mean_node = mean[random.randint(0,4)]
+                        variance_node = variance[random.randint(0,4)]
+                else:
+                    if np.nan in parents:
+                        if parents.count(np.nan) < len(parents):
+                            nan_index = [i for i,d in enumerate(parents) if str(d)=='nan']
+                            dists = []
+                            for vector in parents_mean:
+                                dists.append(distance.euclidean([p for p in parents if parents.index(p) not in nan_index], [p for p in vector if vector.index(p) not in nan_index]))
+                                label = dists.index(min(dists))
+                                mean_node = mean[label]
+                                variance_node = variance[label]
+                        else:
+                            mean_node = mean[random.randint(0,4)]
+                            variance_node = variance[random.randint(0,4)]
+                    else:
+                        dists = []
+                        for vector in parents_mean:
+                            dists.append(distance.euclidean(parents, vector))
+                        label = dists.index(min(dists))
+                        mean_node = mean[label]
+                        variance_node = variance[label]
+
+
+
+            
+        else:
+            if (self.Vdataentry["parents"] != None):
+                for x in range(len(self.Vdataentry["parents"])):
+                    if (pvalues[x] != "default"):
+                        mean += pvalues[x] * self.Vdataentry["mean_scal"][x]
+                    else:
+                        print ("Attempted to sample node with unassigned parents.")
+            mean_node = mean
+            variance_node = variance
+
+
+       
+
+        # if (self.Vdataentry["parents"] != None):
+        #     for x in range(len(self.Vdataentry["parents"])):
+        #         if (pvalues[x] != "default"):
+        #             mean += pvalues[x] * self.Vdataentry["mean_scal"][x]
+        #         else:
+        #             print ("Attempted to sample node with unassigned parents.")
+
+        #variance = self.Vdataentry["variance"]
+
+        # draw random outcome from Gaussian
+        # note that this built in function takes the standard deviation, not the
+        # variance, thus requiring a square root
+        return random.gauss(mean_node, math.sqrt(variance_node))          
