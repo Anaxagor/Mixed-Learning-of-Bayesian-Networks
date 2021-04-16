@@ -59,7 +59,10 @@ def k2_metric(network: GraphObject, data: pd.DataFrame):
             no_nodes.append(node)
 
     #return [random.random()]
-    score = K2Score(data).score(bn_model) #+ 10000*(len(no_nodes) / len(nodes))
+    density = 10000*(2*(len(struct)) / ((len(nodes) - 1)*len(nodes)))
+    nodes_have = 10000*(len(no_nodes) / len(nodes))
+    score = K2Score(data).score(bn_model) - density
+    score = score + nodes_have
     return [score]
 
 
@@ -90,6 +93,19 @@ def _has_disc_parents(graph):
             raise ValueError(f'Discrete node has cont parent')
     return True
 
+# def _has_many_parents(graph, nodes):
+#     graph, labels = chain_as_nx_graph(graph)
+#     struct = []
+#     for pair in graph.edges():
+#         struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+#     children_parent = dict()
+#     for node in nodes:
+#         for pair in struct:
+#             if node in pair:
+
+
+
+
 
 def _has_no_cycle(graph: GraphObject):
     nx_graph, _ = chain_as_nx_graph(graph)
@@ -111,7 +127,7 @@ def mi_metric(network: GraphObject, data: pd.DataFrame):
     #         no_nodes.append(node)
 
     #return [random.random()]
-    score = mi(struct, data) #+ 10000*(len(no_nodes) / len(nodes))
+    score = mi(struct, data) #+ 100*(len(no_nodes) / len(nodes))
     return [score]
 
 
@@ -125,7 +141,7 @@ def run_bayesian_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = date
     requirements = GPComposerRequirements(
         primary=nodes_types,
         secondary=nodes_types, max_arity=4,
-        max_depth=3, pop_size=25, num_of_generations=30,
+        max_depth=3, pop_size=50, num_of_generations=50,
         crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
 
     optimiser_parameters = GPChainOptimiserParameters(
