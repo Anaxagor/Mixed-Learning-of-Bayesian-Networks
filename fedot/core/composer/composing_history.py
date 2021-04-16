@@ -1,6 +1,6 @@
 import csv
-import os
 import itertools
+import os
 from typing import (Any, List)
 
 from fedot.core.chains.chain_template import ChainTemplate
@@ -28,22 +28,28 @@ class ComposingHistory:
         return chain_template
 
     def add_to_history(self, individuals: List[Any]):
-        new_individuals = []
-        chains_comp_time = []
-        for chain in individuals:
-            new_individuals.append(self._convert_chain_to_template(chain))
-            chains_comp_time.append(chain.computation_time)
-        self.chains.append(new_individuals)
-        self.chains_comp_time_history.append(chains_comp_time)
+        try:
+            new_individuals = []
+            chains_comp_time = []
+            for chain in individuals:
+                new_individuals.append(self._convert_chain_to_template(chain))
+                chains_comp_time.append(chain.computation_time)
+            self.chains.append(new_individuals)
+            self.chains_comp_time_history.append(chains_comp_time)
+        except Exception as ex:
+            print(f'Cannot add to history: {ex}')
 
     def add_to_archive_history(self, individuals: List[Any]):
-        new_individuals = []
-        archive_comp_time = []
-        for chain in individuals:
-            new_individuals.append(self._convert_chain_to_template(chain))
-            archive_comp_time.append(chain.computation_time)
-        self.archive_history.append(new_individuals)
-        self.archive_comp_time_history.append(archive_comp_time)
+        try:
+            new_individuals = []
+            archive_comp_time = []
+            for chain in individuals:
+                new_individuals.append(self._convert_chain_to_template(chain))
+                archive_comp_time.append(chain.computation_time)
+            self.archive_history.append(new_individuals)
+            self.archive_comp_time_history.append(archive_comp_time)
+        except Exception as ex:
+            print(f'Cannot add to archive history: {ex}')
 
     def write_composer_history_to_csv(self, file='history.csv'):
         history_dir = os.path.join(default_fedot_data_dir(), 'composing_history')
@@ -58,7 +64,7 @@ class ComposingHistory:
                     fitness = chain.fitness.values
                 else:
                     fitness = chain.fitness
-                row = [idx, gen_num, fitness, len(chain.model_templates), chain.depth,
+                row = [idx, gen_num, fitness, len(chain.operation_templates), chain.depth,
                        self.chains_comp_time_history[gen_num][chain_num]]
                 self._add_history_to_csv(file, row)
                 idx += 1
@@ -69,7 +75,7 @@ class ComposingHistory:
             metric_str = 'metric'
             if self.is_multi_objective:
                 metric_str += 's'
-            row = ['index', 'generation', metric_str, 'quantity_of_models', 'depth', 'computation_time']
+            row = ['index', 'generation', metric_str, 'quantity_of_operations', 'depth', 'computation_time']
             writer.writerow(row)
 
     def _add_history_to_csv(self, f: str, row: List[Any]):

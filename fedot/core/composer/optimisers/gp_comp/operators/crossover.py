@@ -18,23 +18,31 @@ class CrossoverTypesEnum(Enum):
     none = 'none'
 
 
-def will_crossover_be_applied(chain_first, chain_second, crossover_prob, type) -> bool:
-    return not (chain_first is chain_second or random() > crossover_prob or type == CrossoverTypesEnum.none)
+def will_crossover_be_applied(chain_first, chain_second, crossover_prob, crossover_type) -> bool:
+    return not (chain_first is chain_second or
+                random() > crossover_prob or
+                crossover_type == CrossoverTypesEnum.none)
 
 
-def crossover(types: List[CrossoverTypesEnum], chain_first: Any, chain_second: Any, max_depth: int, log: Log,
-              crossover_prob: float = 0.8) -> Any:
-    type = choice(types)
+def crossover(types: List[CrossoverTypesEnum],
+              chain_first: Any, chain_second: Any,
+              max_depth: int, log: Log, crossover_prob: float = 0.8, chain_generation_params=None) -> Any:
+    crossover_type = choice(types)
+    rules = chain_generation_params.rules_for_constraint if chain_generation_params else None
     try:
-        if will_crossover_be_applied(chain_first, chain_second, crossover_prob, type):
-            if type in crossover_by_type.keys():
-                for i in range(MAX_NUM_OF_ATTEMPTS):
-                    new_chains = crossover_by_type[type](deepcopy(chain_first), deepcopy(chain_second), max_depth)
-                    are_correct = all([constraint_function(new_chain) for new_chain in new_chains])
+        if will_crossover_be_applied(chain_first, chain_second, crossover_prob, crossover_type):
+            if crossover_type in crossover_by_type.keys():
+                for _ in range(MAX_NUM_OF_ATTEMPTS):
+                    new_chains = crossover_by_type[crossover_type](deepcopy(chain_first),
+                                                                   deepcopy(chain_second), max_depth)
+                    are_correct = \
+                        all([constraint_function(new_chain,
+                                                 rules) for new_chain
+                             in new_chains])
                     if are_correct:
                         return new_chains
             else:
-                raise ValueError(f'Required crossover type not found: {type}')
+                raise ValueError(f'Required crossover type not found: {crossover_type}')
 
             log.debug('Number of crossover attempts exceeded. '
                       'Please check composer requirements for correctness.')

@@ -1,21 +1,21 @@
 import math
-import numpy as np
 from copy import deepcopy
 from functools import partial
 from typing import (Any, Callable, List, Optional, Tuple, Union)
 
+import numpy as np
+
 from fedot.core.composer.composing_history import ComposingHistory
 from fedot.core.composer.constraint import constraint_function
+from fedot.core.composer.optimisers.gp_comp.gp_operators import calculate_objective, duplicates_filtration, \
+    evaluate_individuals, num_of_parents_in_crossover, random_chain
 from fedot.core.composer.optimisers.gp_comp.operators.crossover import CrossoverTypesEnum, crossover
-from fedot.core.composer.optimisers.gp_comp.gp_operators import random_chain, num_of_parents_in_crossover, \
-    calculate_objective, evaluate_individuals
 from fedot.core.composer.optimisers.gp_comp.operators.inheritance import GeneticSchemeTypesEnum, inheritance
-from fedot.core.composer.optimisers.gp_comp.gp_operators import duplicates_filtration
-from fedot.core.composer.optimisers.utils.population_utils import is_equal_archive, is_equal_fitness
 from fedot.core.composer.optimisers.gp_comp.operators.mutation import MutationTypesEnum, mutation
 from fedot.core.composer.optimisers.gp_comp.operators.regularization import RegularizationTypesEnum, \
     regularized_population
 from fedot.core.composer.optimisers.gp_comp.operators.selection import SelectionTypesEnum, selection
+from fedot.core.composer.optimisers.utils.population_utils import is_equal_archive, is_equal_fitness
 from fedot.core.composer.timer import CompositionTimer
 from fedot.core.log import Log, default_log
 from fedot.core.repository.quality_metrics_repository import MetricsEnum
@@ -59,12 +59,24 @@ class GPChainOptimiserParameters:
         self.set_default_params()
 
     def set_default_params(self):
+        """
+        Choose default configuration of the evolutionary operators
+        """
         if not self.selection_types:
-            self.selection_types = [SelectionTypesEnum.tournament]
+            if self.multi_objective:
+                self.selection_types = [SelectionTypesEnum.spea2]
+            else:
+                self.selection_types = [SelectionTypesEnum.tournament]
+
         if not self.crossover_types:
-            self.crossover_types = [CrossoverTypesEnum.subtree]
+            self.crossover_types = [CrossoverTypesEnum.subtree, CrossoverTypesEnum.one_point]
+
         if not self.mutation_types:
-            self.mutation_types = [MutationTypesEnum.simple]
+            self.mutation_types = [MutationTypesEnum.parameter_change,
+                                   MutationTypesEnum.simple,
+                                   MutationTypesEnum.reduce,
+                                   MutationTypesEnum.growth,
+                                   MutationTypesEnum.local_growth]
 
 
 class GPChainOptimiser:
@@ -124,19 +136,17 @@ class GPChainOptimiser:
                  on_next_iteration_callback: Optional[Callable] = None):
         if on_next_iteration_callback is None:
             on_next_iteration_callback = self.default_on_next_iteration_callback
-        print('done')
-   
+
         if self.population is None:
             self.population = self._make_population(self.requirements.pop_size)
 
         num_of_new_individuals = self.offspring_size(offspring_rate)
-        
 
         with CompositionTimer(log=self.log, max_lead_time=self.requirements.max_lead_time) as t:
 
-            if self.requirements.add_single_model_chains:
-                self.best_single_model, self.requirements.primary = \
-                    self._best_single_models(objective_function, timer=t)
+            if self.requirements.allow_single_operations:
+                self.best_single_operation, self.requirements.primary = \
+                    self._best_single_operations(objective_function, timer=t)
 
             self._evaluate_individuals(self.population, objective_function, timer=t)
 
@@ -158,10 +168,12 @@ class GPChainOptimiser:
                 if self.parameters.with_auto_depth_configuration and self.generation_num != 0:
                     self.max_depth_recount()
 
-                individuals_to_select = regularized_population(reg_type=self.parameters.regularization_type,
-                                                               population=self.population,
-                                                               objective_function=objective_function,
-                                                               chain_class=self.chain_class, timer=t)
+                individuals_to_select = \
+                    regularized_population(reg_type=self.parameters.regularization_type,
+                                           population=self.population,
+                                           objective_function=objective_function,
+                                           chain_generation_params=self.chain_generation_params.chain_class,
+                                           timer=t)
 
                 if self.parameters.multi_objective:
                     filtered_archive_items = duplicates_filtration(archive=self.archive,
@@ -239,7 +251,8 @@ class GPChainOptimiser:
 
     def log_info_about_best(self):
         if self.parameters.multi_objective:
-            self.log.info(f'Pareto Frontier: {[item.fitness.values for item in self.archive.items]}')
+            self.log.info(f'Pareto Frontier: '
+                          f'{[item.fitness.values for item in self.archive.items if item.fitness is not None]}')
         else:
             self.log.info(f'Best metric is {self.best_individual.fitness}')
 
@@ -267,8 +280,8 @@ class GPChainOptimiser:
         simpler_equivalents = {}
         for i in sort_inds:
             is_fitness_equals_to_best = is_equal_fitness(best_ind.fitness, individuals[i].fitness)
-            has_less_num_of_models_than_best = len(individuals[i].nodes) < len(best_ind.nodes)
-            if is_fitness_equals_to_best and has_less_num_of_models_than_best:
+            has_less_num_of_operations_than_best = len(individuals[i].nodes) < len(best_ind.nodes)
+            if is_fitness_equals_to_best and has_less_num_of_operations_than_best:
                 simpler_equivalents[i] = len(individuals[i].nodes)
         return simpler_equivalents
 
@@ -278,7 +291,8 @@ class GPChainOptimiser:
                                  selected_individual_first,
                                  selected_individual_second,
                                  crossover_prob=self.requirements.crossover_prob,
-                                 max_depth=self.max_depth, log=self.log)
+                                 max_depth=self.max_depth, log=self.log,
+                                 chain_generation_params=self.chain_generation_params)
         else:
             new_inds = [selected_individual_first]
 
@@ -291,13 +305,13 @@ class GPChainOptimiser:
         return new_inds
 
     def _make_population(self, pop_size: int) -> List[Any]:
-        model_chains = []
+        operation_chains = []
         iter_number = 0
-        while len(model_chains) < pop_size:
+        while len(operation_chains) < pop_size:
             iter_number += 1
             chain = self.chain_generation_function()
-            if constraint_function(chain):
-                model_chains.append(chain)
+            if constraint_function(chain, self.chain_generation_params.rules_for_constraint):
+                operation_chains.append(chain)
 
             if iter_number > MAX_NUM_OF_GENERATED_INDS:
                 self.log.debug(
@@ -305,31 +319,33 @@ class GPChainOptimiser:
                     f'Process is stopped')
                 break
 
-        return model_chains
+        return operation_chains
 
-    def _best_single_models(self, objective_function: Callable, num_best: int = 7, timer=None):
+    def _best_single_operations(self, objective_function: Callable, num_best: int = 7, timer=None):
         is_process_skipped = False
-        single_models_inds = []
-        for model in self.requirements.primary:
-            single_models_ind = self.chain_class([self.primary_node_func(model)])
-            single_models_ind.fitness = calculate_objective(single_models_ind, objective_function,
-                                                            self.parameters.multi_objective)
-            if single_models_ind.fitness is not None:
-                single_models_inds.append(single_models_ind)
+        single_operations_inds = []
+        for operation in self.requirements.primary:
+            single_operations_ind = self.chain_class([self.primary_node_func(operation)])
+            single_operations_ind.fitness = calculate_objective(single_operations_ind,
+                                                                objective_function,
+                                                                self.parameters.multi_objective)
+            if single_operations_ind.fitness is not None:
+                single_operations_inds.append(single_operations_ind)
 
-            if single_models_inds:
+            if single_operations_inds:
                 if timer is not None:
                     if timer.is_time_limit_reached():
                         break
 
-        best_inds = sorted(single_models_inds, key=lambda ind: ind.fitness)
+        best_inds = sorted(single_operations_inds, key=lambda ind: ind.fitness)
         if is_process_skipped:
             self.population = [best_inds[0]]
+
         if timer is not None:
-            single_models_eval_time = timer.minutes_from_start
-            self.log.info(f'Single models evaluation time: {single_models_eval_time}')
-            timer.set_init_time(single_models_eval_time)
-        return best_inds[0], [i.nodes[0].model.model_type for i in best_inds][:num_best]
+            single_operations_eval_time = timer.minutes_from_start
+            self.log.info(f'Single operations evaluation time: {single_operations_eval_time}')
+            timer.set_init_time(single_operations_eval_time)
+        return best_inds[0], [i.nodes[0].operation.operation_type for i in best_inds][:num_best]
 
     def offspring_size(self, offspring_rate: float = None):
         default_offspring_rate = 0.5 if not offspring_rate else offspring_rate
@@ -352,9 +368,9 @@ class GPChainOptimiser:
         if not self.parameters.multi_objective:
             best = self.best_individual
 
-            if self.requirements.add_single_model_chains and \
-                    (self.best_single_model.fitness <= best.fitness):
-                best = self.best_single_model
+            if self.requirements.allow_single_operations and \
+                    (self.best_single_operation.fitness <= best.fitness):
+                best = self.best_single_operation
         else:
             best = self.archive.items
         return best

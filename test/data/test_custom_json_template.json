@@ -1,0 +1,94 @@
+{
+    "nodes": [
+        {
+            "operation_id": 3,
+            "operation_type": "xgboost",
+            "params": "default_params",
+            "nodes_from": [],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 4,
+            "operation_type": "lda",
+            "params": {
+                "n_components": 1
+            },
+            "nodes_from": [],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 2,
+            "operation_type": "logit",
+            "params": "default_params",
+            "nodes_from": [
+                3,
+                4
+            ],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 6,
+            "operation_type": "knn",
+            "params": {
+                "n_neighbors": 9
+            },
+            "nodes_from": [],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 5,
+            "operation_type": "knn",
+            "params": {
+                "n_neighbors": 5
+            },
+            "nodes_from": [
+                4,
+                6
+            ],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 7,
+            "operation_type": "logit",
+            "params": "default_params",
+            "nodes_from": [],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 1,
+            "operation_type": "lda",
+            "params": {
+                "n_components": 1
+            },
+            "nodes_from": [
+                2,
+                5,
+                7
+            ],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 8,
+            "operation_type": "xgboost",
+            "params": "default_params",
+            "nodes_from": [
+                7,
+                2,
+                6
+            ],
+            "preprocessor": "scaling"
+        },
+        {
+            "operation_id": 0,
+            "operation_type": "knn",
+            "params": {
+                "n_neighbors": 8
+            },
+            "nodes_from": [
+                1,
+                8
+            ],
+            "preprocessor": "scaling"
+        }
+    ]
+}
