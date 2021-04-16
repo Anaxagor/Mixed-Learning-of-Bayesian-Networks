@@ -11,8 +11,8 @@ from scipy.stats import norm
 from sklearn import linear_model
 from bayesian.structure_score import MIG
 from sklearn import mixture
-from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
-
+#from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
+from bayesian.redef_HC import hc as hc_method
 
 import datetime
 import os
@@ -157,7 +157,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                 init_edges = []
                 for pair in init_edges_old:
                     init_edges.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-            bn = hc_method(data.values, restriction=white_list, init_edges=init_edges, remove_geo_edges=remove_init_edges, black_list=blacklist_new)
+            bn = hc_method(data, restriction=white_list, init_edges=init_edges, remove_geo_edges=remove_init_edges, black_list=blacklist_new)
             structure = []
             nodes = sorted(list(bn.nodes()))
             for rv in nodes:
