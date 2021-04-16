@@ -40,7 +40,7 @@ from external.pyBN.classes.bayesnet import BayesNet
 from external.pyBN.learning.parameter.mle import mle_estimator
 from external.pyBN.learning.parameter.bayes import bayes_estimator
 from external.pyBN.learning.structure.score.info_scores import log_likelihood, AIC
-from bayesian.mi_entropy_gauss import mi_gauss as mutual_information
+from bayesian.mi_entropy_gauss import mi_gauss
 from external.pyBN.utils.graph import would_cause_cycle
 from pomegranate import BayesianNetwork
 import matplotlib.pyplot as plt
@@ -50,7 +50,7 @@ from bayesian.save_bn import save_params, save_structure, read_params, read_stru
 from bayesian.train_bn import parameter_learning
 from bayesian.calculate_accuracy import calculate_acc
 from external.libpgm.hybayesiannetwork import HyBayesianNetwork
-#from experiments.redef_info_scores import log_lik_local as mutual_information
+from experiments.redef_info_scores import log_lik_local, BIC_local as mutual_information
 
 
 def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restriction=None, init_edges=None, remove_geo_edges=True, black_list=None):
@@ -145,12 +145,10 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
         if node_type[param] == 'disc':
             columns_for_code.append(param) 
     
-    if columns_for_discrete != []:
-        data_discreted, _ = discretization(data, "kmeans", columns_for_discrete)
-    else:
-        data_discreted = data
     
-    mle_estimator(bn, data_discreted.values)
+    
+    
+    #mle_estimator(bn, data_discreted.values)
     #max_score = info_score(bn, data_discreted.values, metric)
 
     data = data.values
@@ -173,7 +171,7 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
 
         if debug:
             print('ITERATION: ' , _iter)
-
+        
         ### TEST ARC ADDITIONS ###
         for u in bn.nodes():
             for v in bn.nodes():
@@ -333,15 +331,15 @@ if __name__ == '__main__':
     #columns = data.columns
     columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
     data_test = data[columns]
-    """healthcare = pd.read_csv('./datasets/sangiovese.csv')
+    
+    healthcare = pd.read_csv('./datasets/sangiovese.csv')
     del healthcare['Unnamed: 0']
     #healthcare.to_csv('../datasets/healthcare1.csv')
-    healthcare = healthcare.iloc[0:500]
+    """healthcare = healthcare.iloc[0:500]
     columns = healthcare.columns
     print(columns)
     healthcare.dropna(inplace=True)
     healthcare.reset_index(inplace=True, drop=True)
-
     data_test = healthcare"""
 
     node_type = get_nodes_type(data_test)
@@ -358,6 +356,8 @@ if __name__ == '__main__':
         data_discereted, est = discretization(data_coded, "kmeans", columns_for_discrete)
     else:
         data_discereted = data_coded
+    
+    
     datacol = data_coded.columns.to_list()
     
     
@@ -367,6 +367,11 @@ if __name__ == '__main__':
             if x != y:
                 if (node_type[x] == 'cont') & (node_type[y] == 'disc'):
                     blacklist.append((x, y))
+    column_name_dict = dict([(n, i) for i, n in enumerate(datacol)])
+    blacklist_new = []
+    for pair in blacklist:
+        blacklist_new.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
+    
 
     """column_name_dict = dict([(n, i) for i, n in enumerate(columns_for_code)])
     bn = hc(data_coded[columns_for_code])
@@ -400,7 +405,7 @@ if __name__ == '__main__':
 
     column_name_dict = dict([(n, i) for i, n in enumerate(list(columns))])
     
-    bn = hc(data_discereted, black_list=blacklist)
+    bn = hc(data_discereted, black_list=blacklist_new)
     structure = []
     nodes = sorted(list(bn.nodes()))
     for rv in nodes:
@@ -412,7 +417,7 @@ if __name__ == '__main__':
     
     skeleton['E'] = structure
 
-    skeleton = {'V': ['Tectonic regime', 'Period', 'Lithology', 'Hydrocarbon type', 'Structural setting', 'Gross', 'Netpay', 'Porosity', 'Permeability', 'Depth'], 'E': [['Tectonic regime', 'Depth'], ['Tectonic regime', 'Netpay'], ['Period', 'Lithology'], ['Hydrocarbon type', 'Permeability'], ['Hydrocarbon type', 'Gross'], ['Hydrocarbon type', 'Porosity'], ['Hydrocarbon type', 'Period'], ['Hydrocarbon type', 'Structural setting'], ['Hydrocarbon type', 'Lithology'], ['Hydrocarbon type', 'Tectonic regime'], ['Structural setting', 'Lithology']]}
+    #skeleton = {'V': ['Tectonic regime', 'Period', 'Lithology', 'Hydrocarbon type', 'Structural setting', 'Gross', 'Netpay', 'Porosity', 'Permeability', 'Depth'], 'E': [['Tectonic regime', 'Depth'], ['Tectonic regime', 'Netpay'], ['Period', 'Lithology'], ['Hydrocarbon type', 'Permeability'], ['Hydrocarbon type', 'Gross'], ['Hydrocarbon type', 'Porosity'], ['Hydrocarbon type', 'Period'], ['Hydrocarbon type', 'Structural setting'], ['Hydrocarbon type', 'Lithology'], ['Hydrocarbon type', 'Tectonic regime'], ['Structural setting', 'Lithology']]}
     print(skeleton)
 
     save_structure(skeleton, 'test')
