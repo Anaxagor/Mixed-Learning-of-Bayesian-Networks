@@ -13,27 +13,28 @@ from bayesian.structure_score import MIG
 from sklearn import mixture
 #from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
 from bayesian.redef_HC import hc as hc_method
-
-import datetime
-import os
-import random
-import pandas as pd
-
-import numpy as np
-from sklearn.metrics import roc_auc_score as roc_auc
-from pgmpy.models import BayesianModel
-from fedot.core.chains.chain_convert import chain_as_nx_graph
-from fedot.core.chains.chain import Chain
-from fedot.core.composer.gp_composer.gp_composer import GPComposerBuilder, GPComposerRequirements
-from fedot.core.composer.optimisers.gp_comp.gp_optimiser import GPChainOptimiserParameters, GeneticSchemeTypesEnum
-from fedot.core.composer.visualisation import ChainVisualiser
-from fedot.core.data.data import InputData
-from fedot.core.repository.model_types_repository import ModelTypesRepository
-from fedot.core.repository.quality_metrics_repository import ClassificationMetricsEnum
-from fedot.core.repository.tasks import Task, TaskTypesEnum
-from fedot.core.utils import project_root
-from pgmpy.estimators import K2Score
 from bayesian.mi_entropy_gauss import mi
+import datetime
+import random
+from functools import partial
+from pathlib import Path
+
+from networkx.algorithms.cycles import simple_cycles
+from pgmpy.estimators import K2Score
+from pgmpy.models import BayesianModel
+
+from fedot.core.chains.chain_convert import chain_as_nx_graph
+from fedot.core.chains.chain_validation import has_no_self_cycled_nodes
+from fedot.core.chains.graph import GraphObject
+from fedot.core.chains.graph_node import PrimaryGraphNode, SecondaryGraphNode
+from fedot.core.composer.gp_composer.gp_composer import ChainGenerationParams, GPComposerRequirements
+from fedot.core.composer.optimisers.gp_comp.gp_optimiser import (
+    GPChainOptimiser,
+    GPChainOptimiserParameters,
+    GeneticSchemeTypesEnum)
+from fedot.core.composer.optimisers.gp_comp.operators.mutation import MutationTypesEnum
+from fedot.core.log import default_log
+
 from sklearn.svm import SVR
 from sklearn.cluster import KMeans
 
@@ -44,62 +45,185 @@ from sklearn.cluster import KMeans
 random.seed(1)
 np.random.seed(1)
 
-def K2(chain: Chain, reference_data: pd.DataFrame) -> float:
-    nodes = reference_data.columns.to_list()
-    graph, labels = chain_as_nx_graph(chain)
-    struct = []
-    for pair in graph.edges():
-        struct.append((str(labels[pair[0]]), str(labels[pair[1]])))
-    BN_model = BayesianModel(struct)
-    no_nodes = []
-    for node in nodes:
-        if node not in BN_model.nodes():
-            no_nodes.append(node)
-    
-    score = K2Score(reference_data).score(BN_model) #+ 1000*len(no_nodes)
-    return score
 
-
-def MI(chain: Chain, reference_data: pd.DataFrame) -> float:
-    nodes = reference_data.columns.to_list()
-    graph, labels = chain_as_nx_graph(chain)
+def k2_metric(network: GraphObject, data: pd.DataFrame):
+    nodes = data.columns.to_list()
+    graph, labels = chain_as_nx_graph(network)
     struct = []
     for pair in graph.edges():
         struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
-    score = mi(struct, reference_data)
-    return score
+    bn_model = BayesianModel(struct)
+    no_nodes = []
+    for node in nodes:
+        if node not in bn_model.nodes():
+            no_nodes.append(node)
+
+    #return [random.random()]
+    score = K2Score(data).score(bn_model) #+ 10000*(len(no_nodes) / len(nodes))
+    return [score]
 
 
-def run_BN_evo_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
-    available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-    composer_requirements = GPComposerRequirements(
-            primary=available_nodes,
-            secondary=available_nodes, max_arity=6,
-            max_depth=3, pop_size=20, num_of_generations=50,
-            crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
-    scheme_type = GeneticSchemeTypesEnum.steady_state
-    optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
-    task = Task(TaskTypesEnum.regression)
-    builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(K2).with_optimiser_parameters(optimiser_parameters)
-    composer = builder.build()
-    chain_evo_composed = composer.compose_chain(data=data)
-    return chain_evo_composed
+def _has_no_duplicates(graph):
+    _, labels = chain_as_nx_graph(graph)
+    list_of_nodes = []
+    for node in labels.values():
+        list_of_nodes.append(str(node))
+    if len(list_of_nodes) != len(set(list_of_nodes)):
+        raise ValueError('Chain has duplicates')
+    return True
 
 
-def run_BN_evo_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
-    available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-    composer_requirements = GPComposerRequirements(
-            primary=available_nodes,
-            secondary=available_nodes, max_arity=6,
-            max_depth=3, pop_size=20, num_of_generations=50,
-            crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
-    scheme_type = GeneticSchemeTypesEnum.steady_state
-    optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
-    task = Task(TaskTypesEnum.regression)
-    builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(MI).with_optimiser_parameters(optimiser_parameters)
-    composer = builder.build()
-    chain_evo_composed = composer.compose_chain(data=data)
-    return chain_evo_composed
+def _has_disc_parents(graph):
+    node_types = {'Tectonic regime': 'disc',
+                  'Period': 'disc',
+                  'Lithology': 'disc',
+                  'Structural setting': 'disc',
+                  'Hydrocarbon type': 'disc',
+                  'Gross': 'cont',
+                  'Netpay': 'cont',
+                  'Porosity': 'cont',
+                  'Permeability': 'cont',
+                  'Depth': 'cont'}
+    graph, labels = chain_as_nx_graph(graph)
+    for pair in graph.edges():
+        if (node_types[str(labels[pair[1]])] == 'disc') & (node_types[str(labels[pair[0]])] == 'cont'):
+            raise ValueError(f'Discrete node has cont parent')
+    return True
+
+
+def _has_no_cycle(graph: GraphObject):
+    nx_graph, _ = chain_as_nx_graph(graph)
+    cycled = list(simple_cycles(nx_graph))
+    if len(cycled) > 0:
+        raise ValueError('Chain has cycle')
+    return True
+
+
+def mi_metric(network: GraphObject, data: pd.DataFrame):
+    nodes = data.columns.to_list()
+    graph, labels = chain_as_nx_graph(network)
+    struct = []
+    for pair in graph.edges():
+        struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+    # no_nodes = []
+    # for node in nodes:
+    #     if node not in bn_model.nodes():
+    #         no_nodes.append(node)
+
+    #return [random.random()]
+    score = mi(struct, data) #+ 10000*(len(no_nodes) / len(nodes))
+    return [score]
+
+
+def run_bayesian_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
+    #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
+    nodes_types = ['Tectonic regime', 'Period', 'Lithology',
+                   'Structural setting', 'Hydrocarbon type', 'Gross', 'Netpay',
+                   'Porosity', 'Permeability', 'Depth']
+    rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
+
+    requirements = GPComposerRequirements(
+        primary=nodes_types,
+        secondary=nodes_types, max_arity=4,
+        max_depth=3, pop_size=25, num_of_generations=30,
+        crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
+
+    optimiser_parameters = GPChainOptimiserParameters(
+        genetic_scheme_type=GeneticSchemeTypesEnum.steady_state,
+        mutation_types=[
+            MutationTypesEnum.simple,
+            MutationTypesEnum.reduce,
+            MutationTypesEnum.growth,
+            MutationTypesEnum.local_growth])
+
+    chain_generation_params = ChainGenerationParams(
+        chain_class=GraphObject,
+        primary_node_func=PrimaryGraphNode,
+        secondary_node_func=SecondaryGraphNode,
+        rules_for_constraint=rules)
+
+    optimizer = GPChainOptimiser(
+        chain_generation_params=chain_generation_params,
+        metrics=[],
+        parameters=optimiser_parameters,
+        requirements=requirements, initial_chain=None,
+        log=default_log(logger_name='Bayesian', verbose_level=4))
+
+    optimized_network = optimizer.optimise(partial(k2_metric, data=data))
+
+    return optimized_network
+
+
+def run_bayesian_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
+    #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
+    nodes_types = ['Tectonic regime', 'Period', 'Lithology',
+                   'Structural setting', 'Hydrocarbon type', 'Gross', 'Netpay',
+                   'Porosity', 'Permeability', 'Depth']
+    rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
+
+    requirements = GPComposerRequirements(
+        primary=nodes_types,
+        secondary=nodes_types, max_arity=4,
+        max_depth=3, pop_size=25, num_of_generations=30,
+        crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
+
+    optimiser_parameters = GPChainOptimiserParameters(
+        genetic_scheme_type=GeneticSchemeTypesEnum.steady_state,
+        mutation_types=[
+            MutationTypesEnum.simple,
+            MutationTypesEnum.reduce,
+            MutationTypesEnum.growth,
+            MutationTypesEnum.local_growth])
+
+    chain_generation_params = ChainGenerationParams(
+        chain_class=GraphObject,
+        primary_node_func=PrimaryGraphNode,
+        secondary_node_func=SecondaryGraphNode,
+        rules_for_constraint=rules)
+
+    optimizer = GPChainOptimiser(
+        chain_generation_params=chain_generation_params,
+        metrics=[],
+        parameters=optimiser_parameters,
+        requirements=requirements, initial_chain=None,
+        log=default_log(logger_name='Bayesian', verbose_level=4))
+
+    optimized_network = optimizer.optimise(partial(mi_metric, data=data))
+
+    return optimized_network
+
+
+
+# def run_BN_evo_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
+#     available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
+#     composer_requirements = GPComposerRequirements(
+#             primary=available_nodes,
+#             secondary=available_nodes, max_arity=6,
+#             max_depth=3, pop_size=20, num_of_generations=50,
+#             crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
+#     scheme_type = GeneticSchemeTypesEnum.steady_state
+#     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
+#     task = Task(TaskTypesEnum.regression)
+#     builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(K2).with_optimiser_parameters(optimiser_parameters)
+#     composer = builder.build()
+#     chain_evo_composed = composer.compose_chain(data=data)
+#     return chain_evo_composed
+
+
+# def run_BN_evo_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
+#     available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
+#     composer_requirements = GPComposerRequirements(
+#             primary=available_nodes,
+#             secondary=available_nodes, max_arity=6,
+#             max_depth=3, pop_size=20, num_of_generations=50,
+#             crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
+#     scheme_type = GeneticSchemeTypesEnum.steady_state
+#     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
+#     task = Task(TaskTypesEnum.regression)
+#     builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(MI).with_optimiser_parameters(optimiser_parameters)
+#     composer = builder.build()
+#     chain_evo_composed = composer.compose_chain(data=data)
+#     return chain_evo_composed
     
 
 
@@ -200,7 +324,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
     if search == 'evo':
 
         if score == "MI":
-            chain = run_BN_evo_MI(data)
+            chain = run_bayesian_MI(data)
             graph, labels = chain_as_nx_graph(chain)
             struct = []
             for pair in graph.edges():
@@ -208,7 +332,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
             skeleton['E'] = struct
        
         if score == "K2":
-            chain = run_BN_evo_K2(data)
+            chain = run_bayesian_K2(data)
             graph, labels = chain_as_nx_graph(chain)
             struct = []
             for pair in graph.edges():
