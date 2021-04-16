@@ -1,3 +1,9 @@
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
+
+
 import datetime
 import random
 from functools import partial
@@ -42,8 +48,8 @@ def k2_metric(network: GraphObject, data: pd.DataFrame):
         if node not in bn_model.nodes():
             no_nodes.append(node)
 
-    return [random.random()]
-    score = K2Score(data).score(bn_model)
+    #return [random.random()]
+    score = K2Score(data).score(bn_model) + 10000*(len(no_nodes) / len(nodes))
     return [score]
 
 
@@ -92,8 +98,8 @@ def run_bayesian(max_lead_time: datetime.timedelta = datetime.timedelta(minutes=
 
     requirements = GPComposerRequirements(
         primary=nodes_types,
-        secondary=nodes_types, max_arity=3,
-        max_depth=3, pop_size=20, num_of_generations=50,
+        secondary=nodes_types, max_arity=4,
+        max_depth=3, pop_size=25, num_of_generations=30,
         crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
 
     optimiser_parameters = GPChainOptimiserParameters(
