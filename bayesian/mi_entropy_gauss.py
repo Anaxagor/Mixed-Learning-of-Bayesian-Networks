@@ -63,23 +63,60 @@ def entropy_gauss(pd_data):
         data = copy(pd_data).values.T 
     else:
         data = np.array(copy(pd_data)).T
-    if (data.ndim == 1) | (copy(data).T.ndim == 1)|(len(data[0]) == 1)|(len(data.T[0]) == 1):
+    if data.size == 0: 
+        return 0.0
+    flag_row = False
+    flag_col = False
+    
+    if isinstance(data[0], np.float64):
+        flag_row = True
+    elif (len(data[0]) < 2) | (data.ndim < 2) :
+        flag_row = True
+    elif data.shape[0] < 2:
+        
+        flag_row = True
+    if isinstance(copy(data).T[0], np.float64):
+        flag_col = True
+    elif (len(copy(data).T) < 2) | (copy(data).T.ndim < 2):
+        flag_col = True
+    elif data.shape[1] < 2:
+        
+        flag_col = True
+
+    if flag_row & flag_col:
+        return sys.float_info.max
+    elif flag_row | flag_col:
         var = np.var(data)
-        if var > 1e-7:
-            return 0.5 * (1 + math.log(var))
+        if var > 1e-16:
+            return 0.5 * (1 + math.log(var*2*math.pi))
         else:
-            return 0.0
-    elif data.size == 0: 
-        return 0.0
-    elif (len(data[0]) == 1) | (len(copy(data).T[0]) == 1):
-        return 0.0
+            return sys.float_info.min
+    else:
+        var = np.linalg.det(np.cov(data))  
+        N = var.ndim      
+        if var > 1e-16:
+            return 0.5 * (N * (1 + math.log(2*math.pi)) + math.log(var))
+        else:
+            return sys.float_info.min
+
+    """elif isinstance(data[0], np.float64) & (len(copy(data).T[0]) == 1):
+        return sys.float_info.max
+    elif (len(data[0]) == 1) & (len(copy(data).T[0]) == 1):
+        return sys.float_info.max
+    elif (data.ndim == 1) | (copy(data).T.ndim == 1)|(len(data[0]) == 1)|(len(data.T[0]) == 1):
+        var = np.var(data)
+        if var > 1e-16:
+            return 0.5 * (1 + math.log(var*2*math.pi))
+        else:
+            return sys.float_info.min
     else:    
 
-        var = np.linalg.det(np.cov(data))        
-        if var > 1e-7:
-            return 0.5 * (1+ math.log(var))
+        var = np.linalg.det(np.cov(data))  
+        N = var.ndim      
+        if var > 1e-16:
+            return 0.5 * (N * (1 + math.log(2*math.pi)) + math.log(var))
         else:
-            return 0.0
+            return sys.float_info.min"""
 
   
 
@@ -139,7 +176,7 @@ def entropy_all(data):
                 filtered_data = query_filter(data, column_disc, list(dict_comb[key]))
                 filtered_data = filtered_data[column_cont]
                 H_cond += comb_prob[key] * entropy_gauss(filtered_data)
-
+                
             return(H_disc + H_cond)
 
 
@@ -192,6 +229,9 @@ def mi_gauss(data, conditional=False):
                     column_cont.append(key)
             data_disc = data[column_disc]
             data_cont = data[column_cont]
+
+            H_gauss = 0.0
+            H_cond = 0.0
             
             if len(column_cont) == 0:
                 return(mutual_information(data_disc.values,conditional = False))
@@ -199,12 +239,12 @@ def mi_gauss(data, conditional=False):
                 if len(column_cont) == 1:
                     return entropy_gauss(data_cont)
                 else:
-                    """data_one = data_cont[column_cont[0]]
+                    data_one = data_cont[[column_cont[0]]]
                     column_cont_trim = copy(column_cont)
                     del column_cont_trim[0]
                     data_cont_trim = data[column_cont_trim]
-                    H_gauss = entropy_gauss(data_one)+entropy_gauss(data_cont_trim)-entropy_gauss(data_cont)"""
-                    H_gauss = entropy_gauss(data_cont)
+                    H_gauss = entropy_gauss(data_one) + entropy_gauss(data_cont_trim)-entropy_gauss(data_cont)
+                    #H_gauss = entropy_gauss(data_cont)
                     H_cond = 0.0
             else:
                 H_gauss = entropy_gauss(data_cont)
@@ -227,6 +267,8 @@ def mi_gauss(data, conditional=False):
                     filtered_data = query_filter(data, column_disc, list(dict_comb[key]))
                     filtered_data = filtered_data[column_cont]
                     H_cond += comb_prob[key] * entropy_gauss(filtered_data)
+                    
+                return (H_gauss-H_cond)
                 
             return(H_gauss-H_cond)
 
