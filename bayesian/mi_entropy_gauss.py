@@ -199,11 +199,12 @@ def mi_gauss(data, conditional=False):
                 if len(column_cont) == 1:
                     return entropy_gauss(data_cont)
                 else:
-                    data_one = data_cont[column_cont[0]]
+                    """data_one = data_cont[column_cont[0]]
                     column_cont_trim = copy(column_cont)
                     del column_cont_trim[0]
                     data_cont_trim = data[column_cont_trim]
-                    H_gauss = entropy_gauss(data_one)+entropy_gauss(data_cont_trim)-entropy_gauss(data_cont)
+                    H_gauss = entropy_gauss(data_one)+entropy_gauss(data_cont_trim)-entropy_gauss(data_cont)"""
+                    H_gauss = entropy_gauss(data_cont)
                     H_cond = 0.0
             else:
                 H_gauss = entropy_gauss(data_cont)
