@@ -1,7 +1,7 @@
-import os,sys,inspect
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(0,parentdir)
+# import os,sys,inspect
+# currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+# parentdir = os.path.dirname(currentdir)
+# sys.path.insert(0,parentdir)
 from copy import copy
 import math
 from typing import List
@@ -302,36 +302,36 @@ def mi(edges: list, data: pd.DataFrame):
     return sum_score
 
 
-if __name__ == '__main__':
-    data = pd.read_csv('./datasets/hackathon_processed.csv')
-    data.dropna(inplace=True)
-    data.reset_index(inplace=True, drop=True)
-    #columns = ['Period', 'Tectonic regime', 'Hydrocarbon type']
-    #columns = ['Gross', 'Netpay','Porosity']
-    #columns = ['Gross', 'Netpay', 'Period']
-    #columns = data.columns
-    columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-    data_test = data[columns]
+# if __name__ == '__main__':
+#     data = pd.read_csv('./datasets/hackathon_processed.csv')
+#     data.dropna(inplace=True)
+#     data.reset_index(inplace=True, drop=True)
+#     #columns = ['Period', 'Tectonic regime', 'Hydrocarbon type']
+#     #columns = ['Gross', 'Netpay','Porosity']
+#     #columns = ['Gross', 'Netpay', 'Period']
+#     #columns = data.columns
+#     columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
+#     data_test = data[columns]
 
-    node_type = get_nodes_type(data_test)
-    columns_for_discrete = []
-    for param in columns:
-        if node_type[param] == 'cont':
-            columns_for_discrete.append(param)
-    columns_for_code = []
-    for param in columns:
-        if node_type[param] == 'disc':
-            columns_for_code.append(param) 
-    data_coded, code_dict = code_categories(data_test, "label", columns_for_code)
-    data_coded
+#     node_type = get_nodes_type(data_test)
+#     columns_for_discrete = []
+#     for param in columns:
+#         if node_type[param] == 'cont':
+#             columns_for_discrete.append(param)
+#     columns_for_code = []
+#     for param in columns:
+#         if node_type[param] == 'disc':
+#             columns_for_code.append(param) 
+#     data_coded, code_dict = code_categories(data_test, "label", columns_for_code)
+#     data_coded
 
-    print(mi_gauss(data_coded))
-    print(mi_gauss(data_coded.values))
-    print(entropy_all(data_coded))
-    print(entropy_all(data_coded.values))
+#     print(mi_gauss(data_coded))
+#     print(mi_gauss(data_coded.values))
+#     print(entropy_all(data_coded))
+#     print(entropy_all(data_coded.values))
 
-    edges = [('Netpay', 'Structural setting'), 
-    ('Porosity', 'Hydrocarbon type')]
+#     edges = [('Netpay', 'Structural setting'), 
+#     ('Porosity', 'Hydrocarbon type')]
 
-    print(mi(edges, data_coded[nodes_from_edges(edges)]))
-    print(mi(edges, data_coded))
+#     print(mi(edges, data_coded[nodes_from_edges(edges)]))
+#     print(mi(edges, data_coded))

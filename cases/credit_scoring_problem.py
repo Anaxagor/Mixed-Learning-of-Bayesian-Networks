@@ -1,9 +1,3 @@
-import os,sys,inspect
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(0,parentdir)
-
-
 import datetime
 import os
 import random
@@ -16,7 +10,8 @@ from fedot.core.composer.gp_composer.gp_composer import GPComposerBuilder, GPCom
 from fedot.core.composer.optimisers.gp_comp.gp_optimiser import GPChainOptimiserParameters, GeneticSchemeTypesEnum
 from fedot.core.composer.visualisation import ChainVisualiser
 from fedot.core.data.data import InputData
-from fedot.core.repository.model_types_repository import ModelTypesRepository
+from fedot.core.log import default_log
+from fedot.core.repository.operation_types_repository import get_operations_for_task
 from fedot.core.repository.quality_metrics_repository import ClassificationMetricsEnum
 from fedot.core.repository.tasks import Task, TaskTypesEnum
 from fedot.core.utils import project_root
@@ -44,7 +39,7 @@ def run_credit_scoring_problem(train_file_path, test_file_path,
     dataset_to_validate = InputData.from_csv(test_file_path, task=task)
 
     # the search of the models provided by the framework that can be used as nodes in a chain for the selected task
-    available_model_types, _ = ModelTypesRepository().suitable_model(task_type=task.task_type)
+    available_model_types = get_operations_for_task(task=task, mode='models')
 
     # the choice of the metric for the chain quality assessment during composition
     metric_function = ClassificationMetricsEnum.ROCAUC_penalty
@@ -60,8 +55,9 @@ def run_credit_scoring_problem(train_file_path, test_file_path,
     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
 
     # Create builder for composer and set composer params
+    logger = default_log('FEDOT logger', verbose_level=4)
     builder = GPComposerBuilder(task=task).with_requirements(composer_requirements). \
-        with_metrics(metric_function).with_optimiser_parameters(optimiser_parameters)
+        with_metrics(metric_function).with_optimiser_parameters(optimiser_parameters).with_logger(logger=logger)
 
     if cache_path:
         builder = builder.with_cache(cache_path)
@@ -74,8 +70,8 @@ def run_credit_scoring_problem(train_file_path, test_file_path,
                                                 is_visualise=True)
 
     if with_tuning:
-        chain_evo_composed.fine_tune_primary_nodes(input_data=dataset_to_compose,
-                                                   iterations=50)
+        # TODO Add tuning
+        raise NotImplementedError(f'Tuning is not supported')
 
     chain_evo_composed.fit(input_data=dataset_to_compose)
 
@@ -118,5 +114,7 @@ def get_scoring_data():
 
 if __name__ == '__main__':
     full_path_train, full_path_test = get_scoring_data()
-    run_credit_scoring_problem(full_path_train, full_path_test, is_visualise=True,
+    run_credit_scoring_problem(full_path_train,
+                               full_path_test,
+                               is_visualise=True,
                                cache_path='credit_scoring_problem_cache')

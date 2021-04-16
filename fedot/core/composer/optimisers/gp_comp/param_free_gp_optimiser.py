@@ -1,20 +1,19 @@
 from copy import deepcopy
-from deap import tools
+from typing import (Any, List, Optional, Tuple)
+
 import numpy as np
-from typing import (Optional, List, Any, Tuple)
+from deap import tools
 
 from fedot.core.composer.iterator import SequenceIterator, fibonacci_sequence
-from fedot.core.composer.optimisers.gp_comp.operators.inheritance import GeneticSchemeTypesEnum, inheritance
-from fedot.core.composer.optimisers.utils.population_utils import is_equal_archive
-from fedot.core.composer.optimisers.gp_comp.gp_operators import duplicates_filtration
+from fedot.core.composer.optimisers.gp_comp.gp_operators import duplicates_filtration, num_of_parents_in_crossover
 from fedot.core.composer.optimisers.gp_comp.gp_optimiser import GPChainOptimiser, GPChainOptimiserParameters
-from fedot.core.composer.optimisers.gp_comp.gp_operators import num_of_parents_in_crossover
-from fedot.core.composer.optimisers.utils.population_utils import get_metric_position
+from fedot.core.composer.optimisers.gp_comp.operators.inheritance import GeneticSchemeTypesEnum, inheritance
 from fedot.core.composer.optimisers.gp_comp.operators.regularization import regularized_population
 from fedot.core.composer.optimisers.gp_comp.operators.selection import selection
+from fedot.core.composer.optimisers.utils.population_utils import get_metric_position, is_equal_archive
 from fedot.core.composer.timer import CompositionTimer
 from fedot.core.log import Log
-from fedot.core.repository.quality_metrics_repository import ComplexityMetricsEnum, MetricsRepository, MetricsEnum, \
+from fedot.core.repository.quality_metrics_repository import ComplexityMetricsEnum, MetricsEnum, MetricsRepository, \
     QualityMetricsEnum
 
 DEFAULT_MAX_POP_SIZE = 55
@@ -67,9 +66,9 @@ class GPChainParameterFreeOptimiser(GPChainOptimiser):
 
         with CompositionTimer(max_lead_time=self.requirements.max_lead_time, log=self.log) as t:
 
-            if self.requirements.add_single_model_chains:
-                self.best_single_model, self.requirements.primary = \
-                    self._best_single_models(objective_function, timer=t)
+            if self.requirements.allow_single_operations:
+                self.best_single_operation, self.requirements.primary = \
+                    self._best_single_operations(objective_function, timer=t)
 
             self._evaluate_individuals(self.population, objective_function, timer=t)
 
@@ -93,10 +92,11 @@ class GPChainParameterFreeOptimiser(GPChainOptimiser):
 
                 self.max_std = self.update_max_std()
 
-                individuals_to_select = regularized_population(reg_type=self.parameters.regularization_type,
-                                                               population=self.population,
-                                                               objective_function=objective_function,
-                                                               chain_class=self.chain_class, timer=t)
+                individuals_to_select = \
+                    regularized_population(reg_type=self.parameters.regularization_type,
+                                           population=self.population,
+                                           objective_function=objective_function,
+                                           chain_generation_params=self.chain_generation_params, timer=t)
 
                 if self.parameters.multi_objective:
                     filtered_archive_items = duplicates_filtration(archive=self.archive,
@@ -198,7 +198,7 @@ class GPChainParameterFreeOptimiser(GPChainOptimiser):
         return fitness_improved, complexity_decreased
 
     def _check_so_improvements(self, offspring: List[Any]) -> Tuple[bool, bool]:
-        suppl_metric = MetricsRepository().metric_by_id(ComplexityMetricsEnum.computation_time)
+        suppl_metric = MetricsRepository().metric_by_id(ComplexityMetricsEnum.node_num)
         best_in_offspring = self.get_best_individual(offspring, equivalents_from_current_pop=False)
         fitness_improved = best_in_offspring.fitness < self.best_individual.fitness
         complexity_decreased = suppl_metric(best_in_offspring) < suppl_metric(

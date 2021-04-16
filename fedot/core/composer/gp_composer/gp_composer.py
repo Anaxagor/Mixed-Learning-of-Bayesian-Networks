@@ -9,7 +9,7 @@ from deap import tools
 from fedot.core.chains.chain import Chain
 from fedot.core.chains.chain_validation import validate
 from fedot.core.chains.node import PrimaryNode, SecondaryNode
-from fedot.core.composer.cache import ModelsCache
+from fedot.core.composer.cache import OperationsCache
 from fedot.core.composer.composer import Composer, ComposerRequirements
 from fedot.core.composer.optimisers.gp_comp.gp_optimiser import GPChainOptimiser, GPChainOptimiserParameters
 from fedot.core.composer.optimisers.gp_comp.operators.inheritance import GeneticSchemeTypesEnum
@@ -18,10 +18,9 @@ from fedot.core.composer.optimisers.gp_comp.operators.regularization import Regu
 from fedot.core.composer.optimisers.gp_comp.param_free_gp_optimiser import GPChainParameterFreeOptimiser
 from fedot.core.data.data import InputData, train_test_data_setup
 from fedot.core.log import Log, default_log
-from fedot.core.repository.model_types_repository import ModelTypesRepository
-from fedot.core.repository.quality_metrics_repository import (ClassificationMetricsEnum, MetricsEnum,
-                                                              MetricsRepository,
-                                                              RegressionMetricsEnum)
+from fedot.core.repository.operation_types_repository import OperationTypesRepository, get_operations_for_task
+from fedot.core.repository.quality_metrics_repository import ClassificationMetricsEnum, MetricsEnum, MetricsRepository, \
+    RegressionMetricsEnum
 from fedot.core.repository.tasks import Task, TaskTypesEnum
 
 sample_split_ration_for_tasks = {
@@ -69,6 +68,7 @@ class ChainGenerationParams:
     primary_node_func: Callable = PrimaryNode
     secondary_node_func: Callable = SecondaryNode
     chain_class: Callable = Chain
+    rules_for_constraint: Optional[List[Callable]] = None
 
 
 class GPComposer(Composer):
@@ -88,7 +88,7 @@ class GPComposer(Composer):
 
         super().__init__(metrics=metrics, composer_requirements=composer_requirements, initial_chain=initial_chain)
 
-        self.cache = ModelsCache()
+        self.cache = OperationsCache()
 
         self.optimiser = optimiser
         self.cache_path = None
@@ -101,6 +101,17 @@ class GPComposer(Composer):
 
     def compose_chain(self, data: InputData, is_visualise: bool = False, is_tune: bool = False,
                       on_next_iteration_callback: Optional[Callable] = None) -> Union[Chain, List[Chain]]:
+        """ Function for optimal chain structure searching
+
+        :param data: InputData for chain composing
+        :param is_visualise: is it needed to visualise
+        :param is_tune: is it needed to tune chain after composing TODO integrate new tuner
+        :param on_next_iteration_callback: TODO add description
+
+        :return best_chain: obtained result after composing: one chain for single-objective optimization;
+            For the multi-objective case, the list of the chain is returned.
+            In the list, the chains are ordered by the descending of primary metric (the first is the best)
+        """
 
         if self.composer_requirements.max_chain_fit_time:
             set_multiprocess_start_method()
@@ -108,18 +119,14 @@ class GPComposer(Composer):
         if not self.optimiser:
             raise AttributeError(f'Optimiser for chain composition is not defined')
 
-        train_data = data
-        test_data = data
-        # = train_test_data_setup(data,
-        #                                               sample_split_ration_for_tasks[data.task.task_type],
-        #                                               task=data.task)
+        train_data, test_data = train_test_data_setup(data,
+                                                      sample_split_ration_for_tasks[data.task.task_type])
         if self.cache_path is None:
             self.cache.clear()
         else:
-            self.cache = ModelsCache(self.cache_path, clear_exiting=not self.use_existing_cache)
+            self.cache = OperationsCache(self.cache_path, clear_exiting=not self.use_existing_cache)
 
         metric_function_for_nodes = partial(self.composer_metric, self.metrics, train_data, test_data)
-        print('start optimise')
 
         best_chain = self.optimiser.optimise(metric_function_for_nodes,
                                              on_next_iteration_callback=on_next_iteration_callback)
@@ -139,12 +146,14 @@ class GPComposer(Composer):
             if type(metrics) is not list:
                 metrics = [metrics]
 
-            #if self.cache is not None:
-            #    chain.fit_from_cache(self.cache)
+            if self.cache is not None:
+                # TODO improve cache
+                chain.fit_from_cache(self.cache)
 
-            #if not chain.is_fitted():
-            #    chain.fit(input_data=train_data, time_constraint=self.composer_requirements.max_chain_fit_time)
-            #    self.cache.save_chain(chain)
+            if not chain.is_fitted():
+                self.log.debug(f'Chain {chain.root_node.descriptive_id} fit started')
+                chain.fit(input_data=train_data, time_constraint=self.composer_requirements.max_chain_fit_time)
+                self.cache.save_chain(chain)
 
             evaluated_metrics = ()
             for metric in metrics:
@@ -164,8 +173,7 @@ class GPComposer(Composer):
 
     @staticmethod
     def tune_chain(chain: Chain, data: InputData, time_limit):
-        # TODO investigate is it necessary
-        chain.fine_tune_all_nodes(input_data=data, max_lead_time=time_limit)
+        raise NotImplementedError()
 
     @property
     def history(self):
@@ -179,11 +187,18 @@ class GPComposerBuilder:
         self.task = task
         self.set_default_composer_params()
 
-    def can_be_secondary_requirement(self, model):
-        repository = ModelTypesRepository()
-        model_tags = repository.model_info_by_id(model).tags
+    def can_be_secondary_requirement(self, operation):
+        models_repo = OperationTypesRepository()
+        data_operations_repo = OperationTypesRepository('data_operation_repository.json')
+
+        operation_name = models_repo.operation_info_by_id(operation)
+        if operation_name is None:
+            operation_name = data_operations_repo.operation_info_by_id(operation)
+        operation_tags = operation_name.tags
+
         secondary_model = True
-        if 'data_model' in model_tags:
+        # TODO remove 'data_model'
+        if 'data_model' in operation_tags:
             secondary_model = False
         return secondary_model
 
@@ -193,7 +208,7 @@ class GPComposerBuilder:
 
     def with_requirements(self, requirements: GPComposerRequirements):
         # TODO move this functionality in composer
-        #requirements.secondary = list(filter(self.can_be_secondary_requirement, requirements.secondary))
+        requirements.secondary = list(filter(self.can_be_secondary_requirement, requirements.secondary))
         self._composer.composer_requirements = requirements
         return self
 
@@ -217,13 +232,19 @@ class GPComposerBuilder:
         return self
 
     def set_default_composer_params(self):
+        """ Method set metrics and composer requirements """
         if not self._composer.composer_requirements:
-            models, _ = ModelTypesRepository().suitable_model(task_type=self.task.task_type)
-            self._composer.composer_requirements = GPComposerRequirements(primary=models, secondary=models)
+            # Get all available operations for task
+            operations = get_operations_for_task(task=self.task, mode='all')
+
+            # Set protected attributes to composer
+            self._composer.composer_requirements = GPComposerRequirements(primary=operations, secondary=operations)
         if not self._composer.metrics:
             metric_function = ClassificationMetricsEnum.ROCAUC_penalty
             if self.task.task_type in (TaskTypesEnum.regression, TaskTypesEnum.ts_forecasting):
                 metric_function = RegressionMetricsEnum.RMSE
+
+            # Set metric
             self._composer.metrics = [metric_function]
 
     def build(self) -> Composer:
