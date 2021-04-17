@@ -33,12 +33,8 @@ sys.path.insert(0,parentdir)
 from scipy.optimize import *
 import numpy as np
 import pandas as pd
-<<<<<<< HEAD
-from heapq import *
-=======
 import warnings
 #from heapq import *
->>>>>>> 43efb40651b172d1747979a221e72bbb2638dd1a
 from copy import copy, deepcopy
 
 from external.pyBN.classes.bayesnet import BayesNet
@@ -401,11 +397,7 @@ if __name__ == '__main__':
 
     column_name_dict = dict([(n, i) for i, n in enumerate(list(columns))])
     
-<<<<<<< HEAD
-    bn = hc(data_coded, black_list=blacklist_new)
-=======
     bn = hc(data_coded, black_list=blacklist_new, metric='MI')
->>>>>>> 43efb40651b172d1747979a221e72bbb2638dd1a
     structure = []
     nodes = sorted(list(bn.nodes()))
     for rv in nodes:

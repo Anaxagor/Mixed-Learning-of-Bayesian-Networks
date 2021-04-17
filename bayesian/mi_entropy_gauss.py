@@ -1,13 +1,7 @@
 import os,sys,inspect
-<<<<<<< HEAD
-# currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-# parentdir = os.path.dirname(currentdir)
-# sys.path.insert(0,parentdir)
-=======
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
->>>>>>> 43efb40651b172d1747979a221e72bbb2638dd1a
 from copy import copy
 import math
 from typing import List
