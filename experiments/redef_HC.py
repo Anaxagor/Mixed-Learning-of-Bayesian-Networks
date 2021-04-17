@@ -30,10 +30,10 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
 
-#from scipy.optimize import *
+from scipy.optimize import *
 import numpy as np
 import pandas as pd
-#from heapq import *
+from heapq import *
 from copy import copy, deepcopy
 
 from external.pyBN.classes.bayesnet import BayesNet
@@ -405,7 +405,7 @@ if __name__ == '__main__':
 
     column_name_dict = dict([(n, i) for i, n in enumerate(list(columns))])
     
-    bn = hc(data_discereted, black_list=blacklist_new)
+    bn = hc(data_coded, black_list=blacklist_new)
     structure = []
     nodes = sorted(list(bn.nodes()))
     for rv in nodes:
@@ -420,16 +420,16 @@ if __name__ == '__main__':
     #skeleton = {'V': ['Tectonic regime', 'Period', 'Lithology', 'Hydrocarbon type', 'Structural setting', 'Gross', 'Netpay', 'Porosity', 'Permeability', 'Depth'], 'E': [['Tectonic regime', 'Depth'], ['Tectonic regime', 'Netpay'], ['Period', 'Lithology'], ['Hydrocarbon type', 'Permeability'], ['Hydrocarbon type', 'Gross'], ['Hydrocarbon type', 'Porosity'], ['Hydrocarbon type', 'Period'], ['Hydrocarbon type', 'Structural setting'], ['Hydrocarbon type', 'Lithology'], ['Hydrocarbon type', 'Tectonic regime'], ['Structural setting', 'Lithology']]}
     print(skeleton)
 
-    save_structure(skeleton, 'test')
-    skel = read_structure('test')
+    # save_structure(skeleton, 'test')
+    # skel = read_structure('test')
 
     
 
-    params = parameter_learning(data_test, node_type, skeleton)
-    save_params(params, 'test_param')
-    params = read_params('test_param')
-    bn = HyBayesianNetwork(skel, params)
-    print(calculate_acc(bn, data_test, columns))
+    # params = parameter_learning(data_test, node_type, skeleton)
+    # save_params(params, 'test_param')
+    # params = read_params('test_param')
+    # bn = HyBayesianNetwork(skel, params)
+    # print(calculate_acc(bn, data_test, columns))
 
     """save_structure(skeleton, 'sangiovese')
     skel = read_structure('sangiovese')

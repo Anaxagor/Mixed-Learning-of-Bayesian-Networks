@@ -1,7 +1,7 @@
-# import os,sys,inspect
-# currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-# parentdir = os.path.dirname(currentdir)
-# sys.path.insert(0,parentdir)
+import os,sys,inspect
+currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0,parentdir)
 
 import numpy as np
 import pandas as pd
@@ -163,30 +163,30 @@ def BIC(bn, data):
 
 
 
-# if __name__ == '__main__':
-#     data = pd.read_csv('./datasets/hackathon_processed.csv')
-#     data.dropna(inplace=True)
-#     data.reset_index(inplace=True, drop=True)
-#     columns = ['Period', 'Tectonic regime', 'Hydrocarbon type']
-#     #columns = ['Gross', 'Netpay','Porosity']
-#     #columns = ['Gross', 'Netpay', 'Period']
-#     #columns = data.columns
-#     #columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-#     data_test = data[columns]
-#     node_type = get_nodes_type(data_test)
-#     columns_for_discrete = []
-#     for param in columns:
-#         if node_type[param] == 'cont':
-#             columns_for_discrete.append(param)
-#     columns_for_code = []
-#     for param in columns:
-#         if node_type[param] == 'disc':
-#             columns_for_code.append(param) 
-#     data_coded, code_dict = code_categories(data_test, "label", columns_for_code)
+if __name__ == '__main__':
+    data = pd.read_csv('./datasets/hackathon_processed.csv')
+    data.dropna(inplace=True)
+    data.reset_index(inplace=True, drop=True)
+    columns = ['Period', 'Tectonic regime', 'Hydrocarbon type']
+    #columns = ['Gross', 'Netpay','Porosity']
+    #columns = ['Gross', 'Netpay', 'Period']
+    #columns = data.columns
+    #columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
+    data_test = data[columns]
+    node_type = get_nodes_type(data_test)
+    columns_for_discrete = []
+    for param in columns:
+        if node_type[param] == 'cont':
+            columns_for_discrete.append(param)
+    columns_for_code = []
+    for param in columns:
+        if node_type[param] == 'disc':
+            columns_for_code.append(param) 
+    data_coded, code_dict = code_categories(data_test, "label", columns_for_code)
 
-#     print(log_lik_local(data_coded['Period']))
-#     print(log_lik_local(data_coded[['Period', 'Tectonic regime']]))
-#     print(log_lik_local(data_coded[['Period', 'Hydrocarbon type']]))
+    print(log_lik_local(data_coded['Period']))
+    print(log_lik_local(data_coded[['Period', 'Tectonic regime']]))
+    print(log_lik_local(data_coded[['Period', 'Hydrocarbon type']]))
 
 
 

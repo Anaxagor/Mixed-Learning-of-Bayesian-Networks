@@ -61,8 +61,8 @@ def k2_metric(network: GraphObject, data: pd.DataFrame):
     #return [random.random()]
     density = 10000*(2*(len(struct)) / ((len(nodes) - 1)*len(nodes)))
     nodes_have = 10000*(len(no_nodes) / len(nodes))
-    score = K2Score(data).score(bn_model) - density
-    score = score + nodes_have
+    score = K2Score(data).score(bn_model) #- density
+    #score = score + nodes_have
     return [score]
 
 
