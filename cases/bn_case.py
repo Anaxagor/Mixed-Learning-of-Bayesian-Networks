@@ -125,8 +125,10 @@ def run_bayesian(max_lead_time: datetime.timedelta = datetime.timedelta(minutes=
 
     optimized_network = optimizer.optimise(partial(k2_metric, data=data))
 
-    optimized_network.show()
+    return optimized_network
+
+    #optimized_network.show()
 
 
 if __name__ == '__main__':
-    run_bayesian()
+    
