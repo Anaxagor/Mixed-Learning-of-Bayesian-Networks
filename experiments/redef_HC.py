@@ -52,7 +52,10 @@ from bayesian.train_bn import parameter_learning
 from bayesian.calculate_accuracy import calculate_acc
 from external.libpgm.hybayesiannetwork import HyBayesianNetwork
 from experiments.redef_info_scores import log_lik_local, BIC_local, AIC_local
-from bayesian.mi_entropy_gauss import mi_gauss   as mutual_information
+from bayesian.mi_entropy_gauss import mi_gauss  
+
+
+
 
 def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restriction=None, init_edges=None, remove_geo_edges=True, black_list=None):
     """
@@ -117,6 +120,15 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
     *bn* : a BayesNet object
 
     """
+    if metric.upper() == "MI":
+        mutual_information = mi_gauss
+    elif metric.upper() == "LL":
+        mutual_information = log_lik_local
+    elif metric.upper() == "BIC":
+        mutual_information = BIC_local
+    elif metric.upper() == "AIC":
+        mutual_information = AIC_local
+
     nrow = data.shape[0]
     ncol = data.shape[1]
     
@@ -171,6 +183,7 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
         max_delta = 0
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
+
 
             if debug:
                 print('ITERATION: ' , _iter)
@@ -337,17 +350,17 @@ if __name__ == '__main__':
     columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
     data_test = data[columns]
     
-    #healthcare = pd.read_csv('./datasets/sangiovese.csv')
+    """#healthcare = pd.read_csv('./datasets/sangiovese.csv')
     healthcare = pd.read_csv('./datasets/healthcare.csv')
     #healthcare = pd.read_csv('./datasets/vk_interests_finance.csv')
     del healthcare['Unnamed: 0']
     #healthcare.to_csv('../datasets/healthcare1.csv')
-    healthcare = healthcare.iloc[0:500]
+    healthcare = healthcare.iloc[0:5000]
     columns = healthcare.columns
     print(columns)
     healthcare.dropna(inplace=True)
     healthcare.reset_index(inplace=True, drop=True)
-    data_test = healthcare
+    data_test = healthcare"""
 
     node_type = get_nodes_type(data_test)
     columns_for_discrete = []
@@ -384,7 +397,7 @@ if __name__ == '__main__':
 
     column_name_dict = dict([(n, i) for i, n in enumerate(list(columns))])
     
-    bn = hc(data_discreted, black_list=blacklist_new)
+    bn = hc(data_coded, black_list=blacklist_new, metric='MI')
     structure = []
     nodes = sorted(list(bn.nodes()))
     for rv in nodes:

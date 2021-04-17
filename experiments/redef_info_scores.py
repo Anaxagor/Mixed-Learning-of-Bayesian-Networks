@@ -17,13 +17,13 @@ from preprocess.numpy_pandas import loc_to_DataFrame, get_type_numpy
 
 def info_score(bn, data, metric='BIC'):
 	if metric.upper() == 'LL':
-		score = log_likelihood(data)
+		score = log_lik_local(data, method=metric.upper())
 	elif metric.upper() == 'BIC':
-		score = BIC_local(data)
+		score = BIC_local(data, method=metric.upper())
 	elif metric.upper() == 'AIC':
-		score = AIC_local(data)
+		score = AIC_local(data, method=metric.upper())
 	else:
-		score = BIC_local(data)
+		score = BIC_local(data, method=metric.upper())
 
 	return score
 	
@@ -102,28 +102,28 @@ def log_likelihood(bn, data):
 		l = tuple([bn.V.index(p) for p in bn.parents(rv)])
 		
 		cols = l1 + l
-		mi_score += mutual_information(data[:,cols])
-		ent_score += entropy(data[:,bn.V.index(rv)])
+		mi_score += mutual_information(data[:,cols], method)
+		ent_score += entropy(data[:,bn.V.index(rv)], method)
 	
 	return (NROW * (mi_score - ent_score))
 		#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
 
-def log_lik_local(data):
+def log_lik_local(data, method = 'LL'):
 	NROW = data.shape[0]
 	with warnings.catch_warnings():
 		warnings.simplefilter("ignore")
 		if isinstance(data, pd.DataFrame):
-			return (NROW * (mutual_information(data) - entropy(data.iloc[:,0])))
+			return (NROW * (mutual_information(data, method) - entropy(data.iloc[:,0], method)))
 		elif isinstance(data, pd.Series):
 			return 0.0
 		elif isinstance(data, np.ndarray):
-			return (NROW * (mutual_information(data) - entropy(data[:,0])))
+			return (NROW * (mutual_information(data, method) - entropy(data[:,0], method)))
 	
 	#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
 
-def BIC_local(data):
+def BIC_local(data, method = 'BIC'):
 	NROW = data.shape[0]
-	log_score = log_lik_local(data)
+	log_score = log_lik_local(data, method)
 	penalty = 0.5 * num_params(data) * np.log(NROW)
 	return log_score - penalty
 
@@ -154,8 +154,8 @@ def num_params(data):
 		print(data)
 		pass
 
-def AIC_local(data):
-	log_score = log_lik_local(data)
+def AIC_local(data, method = 'AIC'):
+	log_score = log_lik_local(data, method)
 	penalty = num_params(data)
 	return log_score - penalty
 
