@@ -6,6 +6,7 @@ sys.path.insert(0,parentdir)
 import numpy as np
 import pandas as pd
 from copy import copy
+import warnings
 
 from bayesian.mi_entropy_gauss import mi_gauss as mutual_information, entropy_all as entropy
 from preprocess.discretization import get_nodes_type, code_categories
@@ -91,29 +92,33 @@ def log_likelihood(bn, data):
 	
 	return NROW * (mi_score - ent_score)
 	"""
+	with warnings.catch_warnings():
+		warnings.simplefilter("ignore")
 
-	NROW = data.shape[0]
-	mi_score = 0
-	ent_score = 0
-	for rv in bn.nodes():
-		l1 = (bn.V.index(rv),)
-		l = tuple([bn.V.index(p) for p in bn.parents(rv)])
+		NROW = data.shape[0]
+		mi_score = 0
+		ent_score = 0
+		for rv in bn.nodes():
+			l1 = (bn.V.index(rv),)
+			l = tuple([bn.V.index(p) for p in bn.parents(rv)])
+			
+			cols = l1 + l
+			mi_score += mutual_information(data[:,cols])
+			ent_score += entropy(data[:,bn.V.index(rv)])
 		
-		cols = l1 + l
-		mi_score += mutual_information(data[:,cols])
-		ent_score += entropy(data[:,bn.V.index(rv)])
-	
-	return (NROW * (mi_score - ent_score))
-	#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
+		return (NROW * (mi_score - ent_score))
+		#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
 
 def log_lik_local(data):
-    NROW = data.shape[0]
-    if isinstance(data, pd.DataFrame):
-        return (NROW * (mutual_information(data) - entropy(data.iloc[:,0])))
-    elif isinstance(data, pd.Series):
-        return 0.0
-    elif isinstance(data, np.ndarray):
-        return (NROW * (mutual_information(data) - entropy(data[:,0])))
+	NROW = data.shape[0]
+	
+	if isinstance(data, pd.DataFrame):
+		return (NROW * (mutual_information(data) - entropy(data.iloc[:,0])))
+	elif isinstance(data, pd.Series):
+		return 0.0
+	elif isinstance(data, np.ndarray):
+		return (NROW * (mutual_information(data) - entropy(data[:,0])))
+	
 	#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
 
 def BIC_local(data):
@@ -148,6 +153,11 @@ def num_params(data):
 		print('Num_params: Unexpected data type')
 		print(data)
 		pass
+
+def AIC_local(data):
+	log_score = log_lik_local(data)
+	penalty = num_params(data)
+	return log_score - penalty
 	
 
 def BIC(bn, data):
