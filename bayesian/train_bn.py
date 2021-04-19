@@ -9,10 +9,11 @@ from pgmpy.estimators import K2Score
 from pomegranate import DiscreteDistribution, ConditionalProbabilityTable
 from scipy.stats import norm
 from sklearn import linear_model
-from bayesian.structure_score import MIG
+from bayesian.structure_score import MIG, LLG, BICG, AICG
 from sklearn import mixture
 #from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
 from bayesian.redef_HC import hc as hc_method
+from experiments.redef_info_scores import info_score
 from bayesian.mi_entropy_gauss import mi
 import datetime
 import random
@@ -130,6 +131,21 @@ def mi_metric(network: GraphObject, data: pd.DataFrame):
     score = mi(struct, data) #+ 100*(len(no_nodes) / len(nodes))
     return [score]
 
+def info_metric(network: GraphObject, data: pd.DataFrame, method='LL'):
+    nodes = data.columns.to_list()
+    graph, labels = chain_as_nx_graph(network)
+    struct = []
+    for pair in graph.edges():
+        struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+    # no_nodes = []
+    # for node in nodes:
+    #     if node not in bn_model.nodes():
+    #         no_nodes.append(node)
+
+    #return [random.random()]
+    score = info_score(struct, data, method) #+ 100*(len(no_nodes) / len(nodes))
+    return [score]
+
 
 def run_bayesian_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
     #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
@@ -205,6 +221,44 @@ def run_bayesian_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = date
         log=default_log(logger_name='Bayesian', verbose_level=4))
 
     optimized_network = optimizer.optimise(partial(mi_metric, data=data))
+
+    return optimized_network
+
+def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), method = 'LL'):
+    #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
+    nodes_types = ['Tectonic regime', 'Period', 'Lithology',
+                   'Structural setting', 'Hydrocarbon type', 'Gross', 'Netpay',
+                   'Porosity', 'Permeability', 'Depth']
+    rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
+
+    requirements = GPComposerRequirements(
+        primary=nodes_types,
+        secondary=nodes_types, max_arity=4,
+        max_depth=3, pop_size=25, num_of_generations=30,
+        crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
+
+    optimiser_parameters = GPChainOptimiserParameters(
+        genetic_scheme_type=GeneticSchemeTypesEnum.steady_state,
+        mutation_types=[
+            MutationTypesEnum.simple,
+            MutationTypesEnum.reduce,
+            MutationTypesEnum.growth,
+            MutationTypesEnum.local_growth])
+
+    chain_generation_params = ChainGenerationParams(
+        chain_class=GraphObject,
+        primary_node_func=PrimaryGraphNode,
+        secondary_node_func=SecondaryGraphNode,
+        rules_for_constraint=rules)
+
+    optimizer = GPChainOptimiser(
+        chain_generation_params=chain_generation_params,
+        metrics=[],
+        parameters=optimiser_parameters,
+        requirements=requirements, initial_chain=None,
+        log=default_log(logger_name='Bayesian', verbose_level=4))
+
+    optimized_network = optimizer.optimise(partial(info_metric, data=data))
 
     return optimized_network
 
@@ -337,6 +391,29 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                                                          fixed_edges=init_edges)
             structure = [list(x) for x in list(best_model_mi_mixed.edges())]
             skeleton['E'] = structure
+        
+        if (score == 'LL_mixed') | (score == 'BIC_mixed') | (score == 'AIC_mixed'):
+            if score == 'LL_mixed':
+                hc_mi_mixed = HillClimbSearch(data, scoring_method=LLG(data=data))
+            if score == 'BIC_mixed':
+                hc_mi_mixed = HillClimbSearch(data, scoring_method=BICG(data=data))
+            if score == 'AIC_mixed':
+                hc_mi_mixed = HillClimbSearch(data, scoring_method=AICG(data=data))
+                
+            if init_edges == None:
+                best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list)
+            else:
+                if remove_init_edges:
+                    startdag = DAG()
+                    startdag.add_nodes_from(nodes=datacol)
+                    startdag.add_edges_from(ebunch=init_edges)
+                    best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list,
+                                                         start_dag=startdag)
+                else:
+                    best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list,
+                                                         fixed_edges=init_edges)
+            structure = [list(x) for x in list(best_model_mi_mixed.edges())]
+            skeleton['E'] = structure
     if search == 'evo':
 
         if score == "MI":
@@ -349,6 +426,14 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
        
         if score == "K2":
             chain = run_bayesian_K2(data)
+            graph, labels = chain_as_nx_graph(chain)
+            struct = []
+            for pair in graph.edges():
+                struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+            skeleton['E'] = struct
+
+        if (score == "LL") | (score == "BIC") | (score == "AIC"):
+            chain = run_bayesian_info(data, method = score)
             graph, labels = chain_as_nx_graph(chain)
             struct = []
             for pair in graph.edges():

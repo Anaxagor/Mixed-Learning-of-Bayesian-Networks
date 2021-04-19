@@ -12,25 +12,35 @@ import warnings
 from bayesian.mi_entropy_gauss import mi_gauss as mutual_information, entropy_all as entropy
 from preprocess.discretization import get_nodes_type, code_categories
 from preprocess.numpy_pandas import loc_to_DataFrame, get_type_numpy
+from preprocess.graph import edges_to_dict
 
 
-
-def info_score(bn, data, metric='BIC'):
-	if metric.upper() == 'LL':
-		score = log_lik_local(data, method=metric.upper())
-	elif metric.upper() == 'BIC':
-		score = BIC_local(data, method=metric.upper())
-	elif metric.upper() == 'AIC':
-		score = AIC_local(data, method=metric.upper())
+def info_score(edges: list, data: pd.DataFrame, method='LL'):
+	if method.upper() == 'LL':
+		score = log_lik_local(data, method=method.upper())
+	elif method.upper() == 'BIC':
+		score = BIC_local(data, method=method.upper())
+	elif method.upper() == 'AIC':
+		score = AIC_local(data, method=method.upper())
 	else:
-		score = BIC_local(data, method=metric.upper())
-
-	return score
+		score = BIC_local(data, method=method.upper())
+	
+	parents_dict = edges_to_dict(edges)
+	sum_score = 0.0
+	nodes_with_edges = parents_dict.keys()
+	for var in nodes_with_edges:
+		child_parents = [var]
+        child_parents.extend(parents_dict[var])
+        sum_score += score(copy(data[child_parents]), method)
+	nodes_without_edges = list(set(data.columns).difference(set(nodes_with_edges)))
+	for var in nodes_without_edges:
+		sum_score += score(copy(data[var]), method)
+	return sum_score
 	
 
 ##### INFORMATION-THEORETIC SCORING FUNCTIONS #####
 
-def log_likelihood(bn, data):
+def log_likelihood(bn, data, method = 'LL'):
 	"""
 	Determining log-likelihood of the parameters
 	of a Bayesian Network. This is a quite simple
