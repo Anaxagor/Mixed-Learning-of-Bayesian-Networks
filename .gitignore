@@ -71,3 +71,5 @@ docs/_build
 build/
 dist/
 *.egg-info
+experiments/exp_with_new_learning0.ipynb
+models/
