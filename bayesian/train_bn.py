@@ -11,7 +11,7 @@ from pomegranate import DiscreteDistribution, ConditionalProbabilityTable
 from scipy.stats import norm
 from sklearn import linear_model
 from bayesian.structure_score import MIG, LLG, BICG, AICG
-from sklearn import mixture
+from sklearn.mixture import GaussianMixture
 #from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
 from bayesian.redef_HC import hc as hc_method
 from bayesian.redef_info_scores import info_score
@@ -197,8 +197,8 @@ def run_bayesian_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = date
 
     requirements = GPComposerRequirements(
         primary=nodes_types,
-        secondary=nodes_types, max_arity=4,
-        max_depth=3, pop_size=25, num_of_generations=30,
+        secondary=nodes_types, max_arity=5,
+        max_depth=3, pop_size=50, num_of_generations=30,
         crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
 
     optimiser_parameters = GPChainOptimiserParameters(
@@ -235,8 +235,8 @@ def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = da
 
     requirements = GPComposerRequirements(
         primary=nodes_types,
-        secondary=nodes_types, max_arity=4,
-        max_depth=3, pop_size=25, num_of_generations=30,
+        secondary=nodes_types, max_arity=5,
+        max_depth=3, pop_size=50, num_of_generations=30,
         crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
 
     optimiser_parameters = GPChainOptimiserParameters(
@@ -633,21 +633,6 @@ def parameter_learning_mix(data: pd.DataFrame, node_type: dict, skeleton: dict) 
     datacol = data.columns.to_list()
     node_data = dict()
     node_data['Vdata'] = dict()
-    cont_columns = []
-    for key in node_type.keys():
-        if node_type[key] == 'cont':
-            cont_columns.append(key)
-    gmm_params = dict()
-    N = 5
-    gmm = mixture.GaussianMixture(n_components=N, covariance_type='full')
-    gmm.fit(data[cont_columns].values)
-    for index, column in enumerate(cont_columns):
-        means = []
-        for component in range (N):
-            means.append(gmm.means_[component][index])
-        gmm_params[column] = means
-            
-        
     for node in datacol:
         children = []
         parents = []
@@ -691,14 +676,27 @@ def parameter_learning_mix(data: pd.DataFrame, node_type: dict, skeleton: dict) 
         if (node_type[node] == "cont") & (len(parents) == 0):
             # mean_base, std = norm.fit(data[node].values)
             # variance = std ** 2
-            mean_base = np.mean(data[node].values)
-            variance = np.var(data[node].values)
+            #mean_base = np.mean(data[node].values)
+            #variance = np.var(data[node].values)
+            n_comp = n_component(data, [node])
+            gmm = GaussianMixture(n_components=n_comp)
+            gmm.fit(np.transpose([data[node].values]))
+            means = gmm.means_
+            means_list = []
+            for el in means:
+                means_list.append(el[0])
+            var = gmm.covariances_
+            var_list = []
+            for v in var:
+                var_list.append(v[0][0])
+            cat = gmm.predict(np.transpose([data[node].values]))
+            dis = str(DiscreteDistribution.from_samples(cat))
             if (len(children) != 0):
-                node_data['Vdata'][node] = {"mean_base": mean_base, "mean_scal": [], "parents": None,
-                                            "variance": variance, "type": "lg", "children": children}
+                node_data['Vdata'][node] = {"mean_base": means_list, "mean_scal": dis, "parents": None,
+                                            "variance": var_list, "type": "lg", "children": children}
             else:
-                node_data['Vdata'][node] = {"mean_base": mean_base, "mean_scal": [], "parents": None,
-                                            "variance": variance, "type": "lg", "children": None}
+                node_data['Vdata'][node] = {"mean_base": means_list, "mean_scal": dis, "parents": None,
+                                            "variance": var_list, "type": "lg", "children": None}
         if (node_type[node] == "cont") & (len(parents) != 0):
             disc_parents = []
             cont_parents = []
@@ -715,65 +713,65 @@ def parameter_learning_mix(data: pd.DataFrame, node_type: dict, skeleton: dict) 
                 # mean_base = np.mean(data[node].values)
                 # variance = np.var(data[node].values)
                 #model = linear_model.BayesianRidge()
-                #model = linear_model.LinearRegression()
+                model = linear_model.LinearRegression()
                 #model = SVR(kernel='linear', C=100, gamma='auto')
                 #gmm = mixture.GaussianMixture(n_components=10, covariance_type='full')
                 
-                # predict = []
-                # if len(parents) == 1:
-                #     model.fit(np.transpose([data[parents[0]].values]), data[node].values)
-                #     predict = model.predict(np.transpose([data[parents[0]].values]))
-                # else:
-                #     model.fit(data[parents].values, data[node].values)
-                #     predict = model.predict(data[parents].values)
+                predict = []
+                if len(parents) == 1:
+                    model.fit(np.transpose([data[parents[0]].values]), data[node].values)
+                    predict = model.predict(np.transpose([data[parents[0]].values]))
+                else:
+                    model.fit(data[parents].values, data[node].values)
+                    predict = model.predict(data[parents].values)
                
                 #gmm.fit(data[parents+[node]].values)
 
-                #variance = (RSE(data[node].values, predict)) ** 2
+                variance = (RSE(data[node].values, predict)) ** 2
                 # means_parent = [[] for i in range (N)]#[list(l)[0:-1] for l in list(gmm.means_)]
                 # for c in range(N):
                 #     for c_p in parents:
                 #         means_parent[c].append(gmm_params[c_p][c])
 
                 # mean_node = gmm_params[node]#[list(l)[-1] for l in list(gmm.means_)]
-                mean_node = []
-                means_parent = []
+                #mean_node = []
+                #means_parent = []
                 #labels = gmm.predict(data[parents+[node]].values)
-                labels = gmm.predict(data[cont_columns].values)
-                diff_data = copy(data)
-                diff_data['labels'] = labels
-                variances = []
-                for i in range(0,N,1):
-                    sample = diff_data.loc[diff_data['labels'] == i]
-                    variances.append(np.var(sample[node].values))
-                    mean_node.append(np.mean(sample[node].values))
-                    parent_one = []
-                    for p in parents:
-                        parent_one.append(np.mean(sample[p].values))
-                    means_parent.append(parent_one)
+                # labels = gmm.predict(data[cont_columns].values)
+                # diff_data = copy(data)
+                # diff_data['labels'] = labels
+                # variances = []
+                # for i in range(0,N,1):
+                #     sample = diff_data.loc[diff_data['labels'] == i]
+                #     variances.append(np.var(sample[node].values))
+                #     mean_node.append(np.mean(sample[node].values))
+                #     parent_one = []
+                #     for p in parents:
+                #         parent_one.append(np.mean(sample[p].values))
+                #     means_parent.append(parent_one)
                 # for var in variances:
                 #     if (str(var) == 'nan'):
                 #         variances[variances.index(var)] = 0
 
-                if (len(children) != 0):
-                    node_data['Vdata'][node] = {"mean_base": mean_node, "mean_scal": means_parent,
-                                                "parents": parents, "variance": variances, "type": "lg",
-                                                "children": children}
-                else:
-                    node_data['Vdata'][node] = {"mean_base": mean_node, "mean_scal": means_parent,
-                                                "parents": parents, "variance": variances, "type": "lg",
-                                                "children": None}
-
-
-
                 # if (len(children) != 0):
-                #     node_data['Vdata'][node] = {"mean_base": model.intercept_[0], "mean_scal": list(model.coef_[0]),
-                #                                 "parents": parents, "variance": variance, "type": "lg",
+                #     node_data['Vdata'][node] = {"mean_base": mean_node, "mean_scal": means_parent,
+                #                                 "parents": parents, "variance": variances, "type": "lg",
                 #                                 "children": children}
                 # else:
-                #     node_data['Vdata'][node] = {"mean_base": model.intercept_[0], "mean_scal": list(model.coef_[0]),
-                #                                 "parents": parents, "variance": variance, "type": "lg",
+                #     node_data['Vdata'][node] = {"mean_base": mean_node, "mean_scal": means_parent,
+                #                                 "parents": parents, "variance": variances, "type": "lg",
                 #                                 "children": None}
+
+
+
+                if (len(children) != 0):
+                    node_data['Vdata'][node] = {"mean_base": model.intercept_, "mean_scal": list(model.coef_),
+                                                "parents": parents, "variance": variance, "type": "lg",
+                                                "children": children}
+                else:
+                    node_data['Vdata'][node] = {"mean_base": model.intercept_, "mean_scal": list(model.coef_),
+                                                "parents": parents, "variance": variance, "type": "lg",
+                                                "children": None}
             if (len(disc_parents) != 0) & (len(cont_parents) != 0):
                 hycprob = dict()
                 values = []
@@ -787,7 +785,7 @@ def parameter_learning_mix(data: pd.DataFrame, node_type: dict, skeleton: dict) 
                     for col, val in zip(disc_parents, comb):
                         mask = (mask) & (data[col] == val)
                     new_data = data[mask]
-                    #predict = []
+                    predict = []
                     # if new_data.shape[0] != 0:
                     #     #mean_base, std = norm.fit(new_data[node].values)
                     #     #variance = std ** 2
@@ -796,38 +794,38 @@ def parameter_learning_mix(data: pd.DataFrame, node_type: dict, skeleton: dict) 
                     key_comb = [str(x) for x in comb]
                     if new_data.shape[0] != 0:
                         #model = linear_model.BayesianRidge()
-                        #model = linear_model.LinearRegression()
+                        model = linear_model.LinearRegression()
                         #model = SVR(kernel='linear', C=100, gamma='auto')
                         #if new_data.shape[0] > N:
                             #gmm = mixture.GaussianMixture(n_components=10, covariance_type='full')
                             
-                            # if len(cont_parents) == 1:
-                            #     model.fit(np.transpose([new_data[cont_parents[0]].values]), new_data[node].values)
-                            #     predict = model.predict(np.transpose([new_data[cont_parents[0]].values]))
-                            # else:
-                            #     model.fit(new_data[cont_parents].values, new_data[node].values)
-                            #     predict = model.predict(new_data[cont_parents].values)
-                            # mean_base = model.intercept_[0]
-                            # variance = (RSE(new_data[node].values, predict)) ** 2
+                        if len(cont_parents) == 1:
+                            model.fit(np.transpose([new_data[cont_parents[0]].values]), new_data[node].values)
+                            predict = model.predict(np.transpose([new_data[cont_parents[0]].values]))
+                        else:
+                            model.fit(new_data[cont_parents].values, new_data[node].values)
+                            predict = model.predict(new_data[cont_parents].values)
+                        mean_base = model.intercept_
+                        variance = (RSE(new_data[node].values, predict)) ** 2
                             #gmm.fit(new_data[cont_parents+[node]].values)
-                        means_parent = []#[list(l)[0:-1] for l in list(gmm.means_)]
-                        mean_node = []#[list(l)[-1] for l in list(gmm.means_)]
-                        labels = gmm.predict(new_data[cont_columns].values)
-                        sample = copy(new_data)
-                        sample['labels'] = labels
-                        variances = []
-                        for i in range(0,N,1):
-                            sample_small = sample.loc[sample['labels'] == i]
-                            variances.append(np.var(sample_small[node].values))
-                            mean_node.append(np.mean(sample_small[node].values))
-                            parent_one = []
-                            for p in cont_parents:
-                                parent_one.append(np.mean(sample_small[p].values))
-                            means_parent.append(parent_one)
+                        # means_parent = []#[list(l)[0:-1] for l in list(gmm.means_)]
+                        # mean_node = []#[list(l)[-1] for l in list(gmm.means_)]
+                        # labels = gmm.predict(new_data[cont_columns].values)
+                        # sample = copy(new_data)
+                        # sample['labels'] = labels
+                        # variances = []
+                        # for i in range(0,N,1):
+                        #     sample_small = sample.loc[sample['labels'] == i]
+                        #     variances.append(np.var(sample_small[node].values))
+                        #     mean_node.append(np.mean(sample_small[node].values))
+                        #     parent_one = []
+                        #     for p in cont_parents:
+                        #         parent_one.append(np.mean(sample_small[p].values))
+                        #     means_parent.append(parent_one)
                         # for var in variances:
                         #     if (str(var) == 'nan'):
                         #         variances[variances.index(var)] = 0
-                        hycprob[str(key_comb)] = {'variance': variances, 'mean_base': mean_node, 'mean_scal': means_parent}
+                        hycprob[str(key_comb)] = {'variance': variance, 'mean_base': mean_base, 'mean_scal': list(model.coef_)}
                         #if new_data.shape[0] <= N:
                             # model = linear_model.LinearRegression()
                             # predict = []

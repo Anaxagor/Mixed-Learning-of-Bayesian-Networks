@@ -30,6 +30,8 @@ import random
 import math
 from scipy.spatial import distance
 import numpy as np
+from sklearn.mixture import GaussianMixture
+from pomegranate import DiscreteDistribution
 class Lg():
     '''
     This class represents a linear Gaussian node, as described above. It contains the *Vdataentry* attribute and the *choose* method.
@@ -77,6 +79,42 @@ class Lg():
                     print ("Attempted to sample node with unassigned parents.")
 
         variance = self.Vdataentry["variance"]
+
+        # draw random outcome from Gaussian
+        # note that this built in function takes the standard deviation, not the
+        # variance, thus requiring a square root
+        return random.gauss(mean, math.sqrt(variance))
+
+    def choose_gmm(self, pvalues, outcome):
+        '''
+        Randomly choose state of node from probability distribution conditioned on *pvalues*.
+        This method has two parts: (1) determining the proper probability
+        distribution, and (2) using that probability distribution to determine
+        an outcome.
+        Arguments:
+            1. *pvalues* -- An array containing the assigned states of the node's parents. This must be in the same order as the parents appear in ``self.Vdataentry['parents']``.
+        The function creates a Gaussian distribution in the manner described in :doc:`lgbayesiannetwork`, and samples from that distribution, returning its outcome.
+        
+        '''
+        random.seed()
+
+        # calculate Bayesian parameters (mean and variance)
+        mean = self.Vdataentry["mean_base"]
+        if (self.Vdataentry["parents"] != None):
+            for x in range(len(self.Vdataentry["parents"])):
+                if (pvalues[x] != "default"):
+                    mean += pvalues[x] * self.Vdataentry["mean_scal"][x]
+                else:
+                    print ("Attempted to sample node with unassigned parents.")
+            variance = self.Vdataentry["variance"]
+        else:
+            dist = DiscreteDistribution.from_json(str(self.Vdataentry["mean_scal"]))
+            index = dist.sample(1)[0]
+            mean = mean[index]
+            variance = self.Vdataentry["variance"][index]
+        
+
+        
 
         # draw random outcome from Gaussian
         # note that this built in function takes the standard deviation, not the

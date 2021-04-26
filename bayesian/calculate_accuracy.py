@@ -9,7 +9,7 @@ from preprocess.discretization import get_nodes_type
 from external.libpgm.hybayesiannetwork import HyBayesianNetwork
 
 
-def calculate_acc(bn: HyBayesianNetwork, data: pd.DataFrame, columns: list) -> (dict, dict):
+def calculate_acc(bn: HyBayesianNetwork, data: pd.DataFrame, columns: list) -> (dict, dict, list, list):
     """Function for calculating of params restoration accuracy
 
     Args:
@@ -57,4 +57,4 @@ def calculate_acc(bn: HyBayesianNetwork, data: pd.DataFrame, columns: list) -> (
             accuracy_dict[key] = round(accuracy_score(real_param[n], pred_param[n]), 2)
         if node_type[key] == 'cont':
             rmse_dict[key] = round(mean_squared_error(real_param[n], pred_param[n], squared=False), 2)
-    return accuracy_dict, rmse_dict
+    return accuracy_dict, rmse_dict, real_param, pred_param
