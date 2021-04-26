@@ -54,6 +54,7 @@ from preprocess.discretization import get_nodes_type, discretization, code_categ
 from bayesian.mi_entropy_gauss import mi_gauss as mutual_information
 
 
+
 def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restriction=None, init_edges=None, remove_geo_edges=True, black_list=None):
     """
     Greedy Hill Climbing search proceeds by choosing the move
@@ -161,8 +162,8 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
     # CREATE EMPIRICAL DISTRIBUTION OBJECT FOR CACHING
     #ED = EmpiricalDistribution(data,names)
 
+    cache = dict()
     
-
     _iter = 0
     improvement = True
 
@@ -181,9 +182,15 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
                     if (init_nodes is None or  not(v in init_nodes)) and (restriction is None or (u,v) in restriction) and (black_list is None or not((u,v) in black_list)):
                         # SCORE FOR 'V' -> gaining a parent
                         old_cols = (v,) + tuple(p_dict[v]) # without 'u' as parent
-                        mi_old = mutual_information(data[:,old_cols])
+                        if not old_cols in cache:
+                            cache[old_cols] = mutual_information(data[:,old_cols])
+                        mi_old = cache[old_cols]
+                        #mi_old = mutual_information(data[:,old_cols])
                         new_cols = old_cols + (u,) # with'u' as parent
-                        mi_new = mutual_information(data[:,new_cols])
+                        if not new_cols in cache:
+                            cache[new_cols] = mutual_information(data[:,new_cols])
+                        mi_new = cache[new_cols]
+                        #mi_new = mutual_information(data[:,new_cols])
                         delta_score = nrow * (mi_old - mi_new)
                         
                         if delta_score > max_delta:
@@ -201,9 +208,15 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
                 if v in c_dict[u]:
                     # SCORE FOR 'V' -> losing a parent
                     old_cols = (v,) + tuple(p_dict[v]) # with 'u' as parent
-                    mi_old = mutual_information(data[:,old_cols])
+                    if not old_cols in cache:
+                            cache[old_cols] = mutual_information(data[:,old_cols])
+                    mi_old = cache[old_cols]
+                    #mi_old = mutual_information(data[:,old_cols])
                     new_cols = tuple([i for i in old_cols if i != u]) # without 'u' as parent
-                    mi_new = mutual_information(data[:,new_cols])
+                    if not new_cols in cache:
+                            cache[new_cols] = mutual_information(data[:,new_cols])
+                    mi_new = cache[new_cols]
+                    #mi_new = mutual_information(data[:,new_cols])
                     delta_score = nrow * (mi_old - mi_new)
 
                     if (delta_score > max_delta):
@@ -237,15 +250,27 @@ def hc(data, metric='LL', max_iter=100, debug=False, init_nodes=None, restrictio
                 if v in c_dict[u] and not would_cause_cycle(c_dict,v,u, reverse=True) and len(p_dict[u])!=3 and (init_nodes is None or not (u in init_nodes)) and (restriction is None or (v,u) in restriction) and (black_list is None or not((v,u) in black_list)):
                     # SCORE FOR 'U' -> gaining 'v' as parent
                     old_cols = (u,) + tuple(p_dict[v]) # without 'v' as parent
-                    mi_old = mutual_information(data[:,old_cols])
+                    if not old_cols in cache:
+                            cache[old_cols] = mutual_information(data[:,old_cols])
+                    mi_old = cache[old_cols]
+                    #mi_old = mutual_information(data[:,old_cols])
                     new_cols = old_cols + (v,) # with 'v' as parent
-                    mi_new = mutual_information(data[:,new_cols])
+                    if not new_cols in cache:
+                            cache[new_cols] = mutual_information(data[:,new_cols])
+                    mi_new = cache[new_cols]
+                    #mi_new = mutual_information(data[:,new_cols])
                     delta1 = -1* nrow * (mi_old - mi_new)
                     # SCORE FOR 'V' -> losing 'u' as parent
                     old_cols = (v,) + tuple(p_dict[v]) # with 'u' as parent
-                    mi_old = mutual_information(data[:,old_cols])
+                    if not old_cols in cache:
+                            cache[old_cols] = mutual_information(data[:,old_cols])
+                    mi_old = cache[old_cols]
+                    #mi_old = mutual_information(data[:,old_cols])
                     new_cols = tuple([u for i in old_cols if i != u]) # without 'u' as parent
-                    mi_new = mutual_information(data[:,new_cols])
+                    if not new_cols in cache:
+                            cache[new_cols] = mutual_information(data[:,new_cols])
+                    mi_new = cache[new_cols]
+                    #mi_new = mutual_information(data[:,new_cols])
                     delta2 = nrow * (mi_old - mi_new)
                     # COMBINED DELTA-SCORES
                     delta_score = delta1 + delta2
