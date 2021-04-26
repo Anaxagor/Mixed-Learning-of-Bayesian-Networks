@@ -1,6 +1,7 @@
 import itertools
 from copy import copy
 import math
+from preprocess.discretization import get_nodes_type
 import numpy as np
 import pandas as pd
 from pgmpy.base import DAG
@@ -78,7 +79,7 @@ def _has_no_duplicates(graph):
 
 
 def _has_disc_parents(graph):
-    node_types = {'Tectonic regime': 'disc',
+    """node_types = {'Tectonic regime': 'disc',
                   'Period': 'disc',
                   'Lithology': 'disc',
                   'Structural setting': 'disc',
@@ -87,8 +88,9 @@ def _has_disc_parents(graph):
                   'Netpay': 'cont',
                   'Porosity': 'cont',
                   'Permeability': 'cont',
-                  'Depth': 'cont'}
+                  'Depth': 'cont'}"""
     graph, labels = chain_as_nx_graph(graph)
+    global node_types
     for pair in graph.edges():
         if (node_types[str(labels[pair[1]])] == 'disc') & (node_types[str(labels[pair[0]])] == 'cont'):
             raise ValueError(f'Discrete node has cont parent')
@@ -188,9 +190,9 @@ def run_bayesian_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = date
 
 def run_bayesian_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
     #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
-    nodes_types = ['Tectonic regime', 'Period', 'Lithology',
-                   'Structural setting', 'Hydrocarbon type', 'Gross', 'Netpay',
-                   'Porosity', 'Permeability', 'Depth']
+    nodes_types = data.columns.to_list()
+    global node_types
+    node_types = get_nodes_type(data)
     rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
 
     requirements = GPComposerRequirements(
@@ -226,9 +228,9 @@ def run_bayesian_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = date
 
 def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), method = 'LL'):
     #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
-    nodes_types = ['Tectonic regime', 'Period', 'Lithology',
-                   'Structural setting', 'Hydrocarbon type', 'Gross', 'Netpay',
-                   'Porosity', 'Permeability', 'Depth']
+    nodes_types = data.columns.to_list()
+    global node_types
+    node_types = get_nodes_type(data)
     rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
 
     requirements = GPComposerRequirements(
@@ -359,6 +361,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                     structure.append([list(column_name_dict.keys())[list(column_name_dict.values()).index(pa)],
                                   list(column_name_dict.keys())[list(column_name_dict.values()).index(rv)]])
             skeleton['E'] = structure
+            
         if score == "K2":
             hc_K2Score = HillClimbSearch(data, scoring_method=K2Score(data))
             if init_edges == None:
@@ -399,7 +402,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                 hc_mi_mixed = HillClimbSearch(data, scoring_method=BICG(data=data))
             if score == 'AIC_mixed':
                 hc_mi_mixed = HillClimbSearch(data, scoring_method=AICG(data=data))
-                
+
             if init_edges == None:
                 best_model_mi_mixed = hc_mi_mixed.estimate(black_list=blacklist, white_list=white_list)
             else:

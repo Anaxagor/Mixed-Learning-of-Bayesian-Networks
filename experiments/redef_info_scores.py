@@ -17,21 +17,21 @@ from preprocess.graph import edges_to_dict
 
 def info_score(edges: list, data: pd.DataFrame, method='LL'):
 	if method.upper() == 'LL':
-		score = log_lik_local(data, method=method.upper())
+		score = log_lik_local
 	elif method.upper() == 'BIC':
-		score = BIC_local(data, method=method.upper())
+		score = BIC_local
 	elif method.upper() == 'AIC':
-		score = AIC_local(data, method=method.upper())
+		score = AIC_local
 	else:
-		score = BIC_local(data, method=method.upper())
+		score = BIC_local
 	
 	parents_dict = edges_to_dict(edges)
 	sum_score = 0.0
 	nodes_with_edges = parents_dict.keys()
 	for var in nodes_with_edges:
 		child_parents = [var]
-        child_parents.extend(parents_dict[var])
-        sum_score += score(copy(data[child_parents]), method)
+		child_parents.extend(parents_dict[var])
+		sum_score += score(copy(data[child_parents]), method)
 	nodes_without_edges = list(set(data.columns).difference(set(nodes_with_edges)))
 	for var in nodes_without_edges:
 		sum_score += score(copy(data[var]), method)
@@ -112,8 +112,8 @@ def log_likelihood(bn, data, method = 'LL'):
 		l = tuple([bn.V.index(p) for p in bn.parents(rv)])
 		
 		cols = l1 + l
-		mi_score += mutual_information(data[:,cols], method)
-		ent_score += entropy(data[:,bn.V.index(rv)], method)
+		mi_score += mutual_information(data[:,cols], method = method)
+		ent_score += entropy(data[:,bn.V.index(rv)], method = method)
 	
 	return (NROW * (mi_score - ent_score))
 		#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
@@ -123,17 +123,17 @@ def log_lik_local(data, method = 'LL'):
 	with warnings.catch_warnings():
 		warnings.simplefilter("ignore")
 		if isinstance(data, pd.DataFrame):
-			return (NROW * (mutual_information(data, method) - entropy(data.iloc[:,0], method)))
+			return (NROW * (mutual_information(data, method = method) - entropy(data.iloc[:,0], method = method)))
 		elif isinstance(data, pd.Series):
 			return 0.0
 		elif isinstance(data, np.ndarray):
-			return (NROW * (mutual_information(data, method) - entropy(data[:,0], method)))
+			return (NROW * (mutual_information(data, method = method) - entropy(data[:,0], method = method)))
 	
 	#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
 
 def BIC_local(data, method = 'BIC'):
 	NROW = data.shape[0]
-	log_score = log_lik_local(data, method)
+	log_score = log_lik_local(data, method = method)
 	penalty = 0.5 * num_params(data) * np.log(NROW)
 	return log_score - penalty
 
@@ -165,7 +165,7 @@ def num_params(data):
 		pass
 
 def AIC_local(data, method = 'AIC'):
-	log_score = log_lik_local(data, method)
+	log_score = log_lik_local(data, method = method)
 	penalty = num_params(data)
 	return log_score - penalty
 

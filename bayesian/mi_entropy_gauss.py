@@ -100,7 +100,7 @@ def entropy_gauss(pd_data):
             return sys.float_info.min
 
 
-def entropy_all(data, method):
+def entropy_all(data, method = 'MI'):
     """
         For one varibale, H(X) is equal to the following:
             -1 * sum of p(x) * log(p(x))
@@ -116,9 +116,9 @@ def entropy_all(data, method):
     -------
     *H* : entropy value"""
     if type(data) is np.ndarray:
-        return entropy_all(loc_to_DataFrame(data), method)
+        return entropy_all(loc_to_DataFrame(data), method = method)
     elif isinstance(data, pd.Series):
-        return(entropy_all(pd.DataFrame(data)), method)
+        return entropy_all(pd.DataFrame(data), method)
     elif (type(data) is pd.DataFrame):
         nodes_type = get_nodes_type(data)
         column_disc = []
@@ -133,7 +133,7 @@ def entropy_all(data, method):
         data_cont = data[column_cont]
         
         if len(column_cont) == 0:
-                return(entropy(data_disc.values))
+                return entropy(data_disc.values)
         elif len(column_disc) == 0:
             return entropy_gauss(data_cont)
         else:      
@@ -166,7 +166,7 @@ def entropy_all(data, method):
                     if H_cond > entropy_gauss(data[column_cont]):
                         H_cond = entropy_gauss(data[column_cont])
                     
-            return(H_disc + H_cond)
+            return (H_disc + H_cond)
 
 def entropy_cond(data, column_cont, column_disc, method):
     data_cont = data[column_cont]
