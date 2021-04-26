@@ -13,7 +13,7 @@ from bayesian.structure_score import MIG, LLG, BICG, AICG
 from sklearn import mixture
 #from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
 from bayesian.redef_HC import hc as hc_method
-from experiments.redef_info_scores import info_score
+from bayesian.redef_info_scores import info_score
 from bayesian.mi_entropy_gauss import mi
 import datetime
 import random
@@ -912,3 +912,25 @@ def RSE(y_true, y_predicted):
 
     rse = math.sqrt(RSS / (len(y_true)))
     return rse
+
+def n_component(data: pd.DataFrame, columns: list):
+    bic = -1000000000000000
+    n = 0
+    for i in range(1, 20, 1):
+        gm = GaussianMixture(n_components=i, random_state=0)
+        if len(columns) == 1:
+            x = np.transpose([data[columns[0]].values])
+        else:
+            x = data[columns].values
+        gm.fit(x)
+        ll_current = np.sum(gm.score_samples(x))  
+        bic_current = (BIC(ll_current, i, data.shape[0]))
+        if bic_current > bic:
+            bic = bic_current
+            n = i
+        else:
+            break
+    return(n)
+
+def BIC (LL, n_components, n):
+    return (LL - ((0.5)*math.log(n)*(n_components-1 + 2*n_components)))
