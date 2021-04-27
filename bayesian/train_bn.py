@@ -338,7 +338,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
     skeleton['V'] = datacol
 
     if search == 'HC':
-        if score == "MI":
+        if (score == "MI") | (score == "LL") | (score == "BIC") | (score == "AIC"):
             column_name_dict = dict([(n, i) for i, n in enumerate(datacol)])
             blacklist_new = []
             for pair in blacklist:
@@ -353,7 +353,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                 init_edges = []
                 for pair in init_edges_old:
                     init_edges.append((column_name_dict[pair[0]], column_name_dict[pair[1]]))
-            bn = hc_method(data, restriction=white_list, init_edges=init_edges, remove_geo_edges=remove_init_edges, black_list=blacklist_new)
+            bn = hc_method(data, metric=score, restriction=white_list, init_edges=init_edges, remove_geo_edges=remove_init_edges, black_list=blacklist_new)
             structure = []
             nodes = sorted(list(bn.nodes()))
             for rv in nodes:

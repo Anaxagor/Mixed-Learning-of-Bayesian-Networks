@@ -3,7 +3,7 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
 from bayesian.mi_entropy_gauss import mi_gauss
-from experiments.redef_info_scores import log_lik_local, BIC_local, AIC_local
+from bayesian.redef_info_scores import log_lik_local, BIC_local, AIC_local
 from pgmpy.estimators.StructureScore import StructureScore
 
 class MIG(StructureScore):
