@@ -9,7 +9,7 @@ from bayesian.save_bn import save_structure, save_params, read_structure, read_p
 from external.libpgm.hybayesiannetwork import HyBayesianNetwork
 from visualization.visualization import draw_BN
 from bayesian.calculate_accuracy import calculate_acc
-from experiments.redef_HC import hc
+from bayesian.redef_HC import hc
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy import stats
@@ -25,9 +25,11 @@ path_dict = {'geo': './datasets/hackathon_processed.csv',
 
 list_for_del = ['healthcare', 'sangiovese', 'mehra']
 
-list_datasets = ['mehra', 'social']
+list_datasets = ['healthcare', 'sangiovese', 'mehra', 'social']
+#list_datasets = ['geo', 'healthcare', 'sangiovese', 'mehra', 'social']
 #list_datasets = ['mehra', 'social']
-list_method = ['MI','LL']
+list_method = ['MI', 'LL']
+#list_method = ['LL']
 
 for name in list_datasets:
     #data = pd.read_csv('./datasets/hackathon_processed.csv')

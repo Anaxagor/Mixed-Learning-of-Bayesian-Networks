@@ -22,12 +22,10 @@ def query_filter(data: pd.DataFrame, columns: List, values: List):
             Arguments
     ----------
     *data* : pandas.DataFrame
-
     Returns
     -------
     *data_trim* : pandas.DataFrame
         Filtered data.
-
     Effects
     -------
     None
@@ -49,12 +47,10 @@ def entropy_gauss(pd_data):
             Arguments
     ----------
     *data* : pd.DataFrame
-
     Returns
     -------
     *entropy* : a float
         The entropy for Gaussian multivariate distributions.
-
     Effects
     -------
     None
@@ -212,16 +208,13 @@ def mi_gauss(data, method='MI', conditional=False):
             Arguments
     ----------
     *data* : pandas.DataFrame
-
     Returns
     -------
     *MI* : a float
         The Mutual Information
-
     Effects
     -------
     None
-
     Notes
     -----
     - Need to preprocess data with code_categories
@@ -286,11 +279,9 @@ def mi(edges: list, data: pd.DataFrame, method='MI'):
     ----------
     *edges* : list
     *data* : pd.DataFrame
-
     Returns
     -------
     *sum_score* : float
-
     Effects
     -------
     None
