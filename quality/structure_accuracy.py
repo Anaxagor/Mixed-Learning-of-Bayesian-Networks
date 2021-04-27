@@ -25,11 +25,11 @@ path_dict = {'geo': './datasets/hackathon_processed.csv',
 
 list_for_del = ['healthcare', 'sangiovese', 'mehra']
 #list_datasets = ['geo', 'healthcare', 'sangiovese', 'mehra', 'social']
-list_datasets = ['sangiovese']
+list_datasets = ['mehra']
 #list_datasets = ['sangiovese']
 
-list_algo = ['evo'] #['HC', 'evo']
-list_method = ['MI', 'LL'] #['MI','LL']
+list_algo = ['HC'] #['HC', 'evo']
+list_method = ['MI'] #['MI','LL']
 list_disc_types = ['gauss', 'disc']
 
 for algo in list_algo:
@@ -65,5 +65,6 @@ for algo in list_algo:
                 params = read_params(file_param)
                 bn = HyBayesianNetwork(skeleton_Graph, params)
                 print(file)
-                print(calculate_acc(bn, data, columns))
+                accuracy_dict, rmse_dict, real_param, pred_param = calculate_acc(bn, data, columns)
+                print(accuracy_dict, rmse_dict)
 
