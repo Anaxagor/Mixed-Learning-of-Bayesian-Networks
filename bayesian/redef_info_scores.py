@@ -1,34 +1,46 @@
-import os,sys,inspect
-currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parentdir = os.path.dirname(currentdir)
-sys.path.insert(0,parentdir)
+# from bayesian.redef_info_scores import BIC_local
+# import os,sys,inspect
+# currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+# parentdir = os.path.dirname(currentdir)
+# sys.path.insert(0,parentdir)
 
 import numpy as np
 import pandas as pd
 from copy import copy
+import warnings
 
 from bayesian.mi_entropy_gauss import mi_gauss as mutual_information, entropy_all as entropy
 from preprocess.discretization import get_nodes_type, code_categories
 from preprocess.numpy_pandas import loc_to_DataFrame, get_type_numpy
+from preprocess.graph import edges_to_dict
 
 
-
-def info_score(bn, data, metric='BIC'):
-	if metric.upper() == 'LL':
-		score = log_likelihood(bn, data)
-	"""elif metric.upper() == 'BIC':
-		score = BIC(bn, data)
-	elif metric.upper() == 'AIC':
-		score = AIC(bn, data)
+def info_score(edges: list, data: pd.DataFrame, method='LL'):
+	if method.upper() == 'LL':
+		score = log_lik_local
+	elif method.upper() == 'BIC':
+		score = BIC_local
+	elif method.upper() == 'AIC':
+		score = AIC_local
 	else:
-		score = BIC(bn, data)"""
-
-	return score
+		score = BIC_local
+	
+	parents_dict = edges_to_dict(edges)
+	sum_score = 0.0
+	nodes_with_edges = parents_dict.keys()
+	for var in nodes_with_edges:
+		child_parents = [var]
+		child_parents.extend(parents_dict[var])
+		sum_score += score(copy(data[child_parents]), method)
+	nodes_without_edges = list(set(data.columns).difference(set(nodes_with_edges)))
+	for var in nodes_without_edges:
+		sum_score += score(copy(data[var]), method)
+	return sum_score
 	
 
 ##### INFORMATION-THEORETIC SCORING FUNCTIONS #####
 
-def log_likelihood(bn, data):
+def log_likelihood(bn, data, method = 'LL'):
 	"""
 	Determining log-likelihood of the parameters
 	of a Bayesian Network. This is a quite simple
@@ -100,25 +112,28 @@ def log_likelihood(bn, data):
 		l = tuple([bn.V.index(p) for p in bn.parents(rv)])
 		
 		cols = l1 + l
-		mi_score += mutual_information(data[:,cols])
-		ent_score += entropy(data[:,bn.V.index(rv)])
+		mi_score += mutual_information(data[:,cols], method = method)
+		ent_score += entropy(data[:,bn.V.index(rv)], method = method)
 	
 	return (NROW * (mi_score - ent_score))
-	#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
+		#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
 
-def log_lik_local(data):
-    NROW = data.shape[0]
-    if isinstance(data, pd.DataFrame):
-        return (NROW * (mutual_information(data) - entropy(data.iloc[:,0])))
-    elif isinstance(data, pd.Series):
-        return 0.0
-    elif isinstance(data, np.ndarray):
-        return (NROW * (mutual_information(data) - entropy(data[:,0])))
-	#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
-
-def BIC_local(data):
+def log_lik_local(data, method = 'LL'):
 	NROW = data.shape[0]
-	log_score = log_lik_local(data)
+	with warnings.catch_warnings():
+		warnings.simplefilter("ignore")
+		if isinstance(data, pd.DataFrame):
+			return (NROW * (mutual_information(data, method = method) - entropy(data.iloc[:,0], method = method)))
+		elif isinstance(data, pd.Series):
+			return 0.0
+		elif isinstance(data, np.ndarray):
+			return (NROW * (mutual_information(data, method = method) - entropy(data[:,0], method = method)))
+	
+	#return ((1/nrow)*(np.sum(np.log((1e+7+bn.flat_cpt())))))
+
+def BIC_local(data, method = 'BIC'):
+	NROW = data.shape[0]
+	log_score = log_lik_local(data, method = method)
 	penalty = 0.5 * num_params(data) * np.log(NROW)
 	return log_score - penalty
 
@@ -148,47 +163,11 @@ def num_params(data):
 		print('Num_params: Unexpected data type')
 		print(data)
 		pass
-	
 
-def BIC(bn, data):
-	"""
-	Bayesian Information Criterion.
-
-	BIC = LL - f(N)*|B|, where f(N) = log(N)/2
-
-	"""
-	log_score = log_likelihood(bn, data)
-	penalty = 0.5 * bn.num_params() * np.log(max(bn.num_edges(),1))
+def AIC_local(data, method = 'AIC'):
+	log_score = log_lik_local(data, method = method)
+	penalty = num_params(data)
 	return log_score - penalty
-
-
-
-if __name__ == '__main__':
-    data = pd.read_csv('./datasets/hackathon_processed.csv')
-    data.dropna(inplace=True)
-    data.reset_index(inplace=True, drop=True)
-    columns = ['Period', 'Tectonic regime', 'Hydrocarbon type']
-    #columns = ['Gross', 'Netpay','Porosity']
-    #columns = ['Gross', 'Netpay', 'Period']
-    #columns = data.columns
-    #columns = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Hydrocarbon type', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-    data_test = data[columns]
-    node_type = get_nodes_type(data_test)
-    columns_for_discrete = []
-    for param in columns:
-        if node_type[param] == 'cont':
-            columns_for_discrete.append(param)
-    columns_for_code = []
-    for param in columns:
-        if node_type[param] == 'disc':
-            columns_for_code.append(param) 
-    data_coded, code_dict = code_categories(data_test, "label", columns_for_code)
-
-    print(log_lik_local(data_coded['Period']))
-    print(log_lik_local(data_coded[['Period', 'Tectonic regime']]))
-    print(log_lik_local(data_coded[['Period', 'Hydrocarbon type']]))
-
-
 
 
 
