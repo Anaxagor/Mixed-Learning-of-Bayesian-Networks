@@ -3,16 +3,12 @@ currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentfram
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0,parentdir)
 import pandas as pd
-from bayesian.train_bn import structure_learning, parameter_learning
-from preprocess.discretization import get_nodes_type, discretization, inverse_discretization, code_categories
-from bayesian.save_bn import save_structure, save_params, read_structure, read_params
+from preprocess.discretization import get_nodes_type, discretization, code_categories
+from bayesian.save_bn import save_structure
 from external.libpgm.hybayesiannetwork import HyBayesianNetwork
-from visualization.visualization import draw_BN
-from bayesian.calculate_accuracy import calculate_acc
-from experiments.redef_HC import hc
-import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy import stats
+
+from bayesian.redef_HC import hc
+
 import time
 
 path_dict = {'geo': './datasets/hackathon_processed.csv',
@@ -25,8 +21,8 @@ path_dict = {'geo': './datasets/hackathon_processed.csv',
 list_for_del = ['healthcare', 'sangiovese', 'mehra']
 
 
-list_datasets = ['social']
-list_method = ['MI', 'LL']
+list_datasets = ['healthcare']
+list_method = ['MI']
 
 for name in list_datasets:
     #data = pd.read_csv('./datasets/hackathon_processed.csv')
