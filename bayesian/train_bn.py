@@ -90,9 +90,9 @@ def _has_disc_parents(graph):
                   'Permeability': 'cont',
                   'Depth': 'cont'}"""
     graph, labels = chain_as_nx_graph(graph)
-    global node_types
+    global node_type
     for pair in graph.edges():
-        if (node_types[str(labels[pair[1]])] == 'disc') & (node_types[str(labels[pair[0]])] == 'cont'):
+        if (node_type[str(labels[pair[1]])] == 'disc') & (node_type[str(labels[pair[0]])] == 'cont'):
             raise ValueError(f'Discrete node has cont parent')
     return True
 
@@ -124,13 +124,20 @@ def mi_metric(network: GraphObject, data: pd.DataFrame):
     struct = []
     for pair in graph.edges():
         struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
-    # no_nodes = []
-    # for node in nodes:
-    #     if node not in bn_model.nodes():
-    #         no_nodes.append(node)
+    bn_model = BayesianModel(struct)
+    no_nodes = []
+    for node in nodes:
+        if node not in bn_model.nodes():
+            no_nodes.append(node)
 
     #return [random.random()]
-    score = mi(struct, data) #+ 100*(len(no_nodes) / len(nodes))
+    score = 0
+    density = (2*(len(struct)) / ((len(nodes) - 1)*len(nodes)))
+    if mi(struct, data) >= 0:
+        score = mi(struct, data) - 10*density
+    else:
+        score = mi(struct, data) - 100*density
+    #score = mi(struct, data) - 10*(2*(len(struct)) / ((len(nodes) - 1)*len(nodes)))#+ 100*(len(no_nodes) / len(nodes))
     return [score]
 
 def info_metric(network: GraphObject, data: pd.DataFrame, method='LL'):
@@ -188,16 +195,16 @@ def run_bayesian_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = date
     return optimized_network
 
 
-def run_bayesian_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
+def run_bayesian_MI(data: pd.DataFrame,  node_types: dict, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
     #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
     nodes_types = data.columns.to_list()
-    global node_types
-    node_types = get_nodes_type(data)
+    global node_type
+    node_type = copy(node_types)
     rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
 
     requirements = GPComposerRequirements(
         primary=nodes_types,
-        secondary=nodes_types, max_arity=5,
+        secondary=nodes_types, max_arity=4,
         max_depth=3, pop_size=50, num_of_generations=30,
         crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
 
@@ -420,7 +427,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
     if search == 'evo':
 
         if score == "MI":
-            chain = run_bayesian_MI(data)
+            chain = run_bayesian_MI(data, node_types = node_type)
             graph, labels = chain_as_nx_graph(chain)
             struct = []
             for pair in graph.edges():
