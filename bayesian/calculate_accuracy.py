@@ -43,7 +43,8 @@ def calculate_acc(bn: HyBayesianNetwork, data: pd.DataFrame, columns: list) -> (
                     real_param[n][i] = test[key]
                 if node_type[key] == 'cont':
                     sample = pd.DataFrame(bn.randomsample(2000, train_dict))
-                    sample = sample.loc[sample[key] >= 0]
+                    if (data[key] > 0).any():
+                        sample = sample.loc[sample[key] >= 0]
                     if sample.shape[0] == 0:
                         print(i)
                     else:
