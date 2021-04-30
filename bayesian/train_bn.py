@@ -131,12 +131,13 @@ def mi_metric(network: GraphObject, data: pd.DataFrame):
             no_nodes.append(node)
 
     #return [random.random()]
-    score = 0
+   
     density = (2*(len(struct)) / ((len(nodes) - 1)*len(nodes)))
-    if mi(struct, data) >= 0:
-        score = mi(struct, data) - 10*density
-    else:
-        score = mi(struct, data) - 100*density
+    # if mi(struct, data) >= 0:
+    #     score = mi(struct, data) - 10*density
+    # else:
+    #     score = mi(struct, data) - 100*density
+    score = mi(struct, data, method='BIC') #- 100*density
     #score = mi(struct, data) - 10*(2*(len(struct)) / ((len(nodes) - 1)*len(nodes)))#+ 100*(len(no_nodes) / len(nodes))
     return [score]
 
@@ -195,7 +196,7 @@ def run_bayesian_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = date
     return optimized_network
 
 
-def run_bayesian_MI(data: pd.DataFrame,  node_types: dict, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
+def run_bayesian_MI(data: pd.DataFrame,  node_types: dict, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=15)):
     #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
     nodes_types = data.columns.to_list()
     global node_type
