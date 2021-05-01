@@ -1,0 +1,9 @@
+Parameter,Strategy,Alg,accuracy
+Treatment,HC,D+M,0.06
+Treatment,HC,M+M,0.06
+Treatment,HC,D+D,0.06
+Treatment,HC,M+D,0.07
+Treatment,evo,D+M,0.06
+Treatment,evo,M+M,0.05
+Treatment,evo,D+D,0.09
+Treatment,evo,M+D,0.02
