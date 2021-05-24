@@ -20,7 +20,7 @@ def generate_synthetics(bn: HyBayesianNetwork, n: int = 1000, evidence: dict = N
         sample = pd.DataFrame(bn.randomsample(5 * n, evidence=evidence))
         cont_nodes = []
         for key in bn.nodes.keys():
-            if (str(type(bn.nodes[key])).split('.')[1] == 'lg') | (str(type(bn.nodes[key])).split('.')[1] == 'lgandd'):
+            if (str(type(bn.nodes[key])).split('.')[2] == 'lg') | (str(type(bn.nodes[key])).split('.')[2] == 'lgandd'):
                 cont_nodes.append(key)
         sample.dropna(inplace=True)
         sample = sample.loc[(sample.loc[:, cont_nodes].values >= 0).all(axis=1)]
@@ -29,7 +29,7 @@ def generate_synthetics(bn: HyBayesianNetwork, n: int = 1000, evidence: dict = N
         sample = pd.DataFrame(bn.randomsample(5 * n))
         cont_nodes = []
         for key in bn.nodes.keys():
-            if (str(type(bn.nodes[key])).split('.')[1] == 'lg') | (str(type(bn.nodes[key])).split('.')[1] == 'lgandd'):
+            if (str(type(bn.nodes[key])).split('.')[2] == 'lg') | (str(type(bn.nodes[key])).split('.')[2] == 'lgandd'):
                 cont_nodes.append(key)
         sample.dropna(inplace=True)
         sample = sample.loc[(sample.loc[:, cont_nodes].values >= 0).all(axis=1)]

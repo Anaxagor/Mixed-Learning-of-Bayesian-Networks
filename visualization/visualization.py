@@ -9,8 +9,7 @@ from matplotlib.patches import Rectangle
 from typing import Dict, List
 
 
-def draw_comparative_hist(parameter: str, original_data: pd.DataFrame, data_without_restore: pd.DataFrame,
-                          data_with_restore: pd.DataFrame, node_type: dict):
+def draw_comparative_hist(parameter: str, original_data: pd.DataFrame, synthetic_data: pd.DataFrame, node_type: dict):
     """Function for drawing comparative distribution
 
     Args:
@@ -27,21 +26,23 @@ def draw_comparative_hist(parameter: str, original_data: pd.DataFrame, data_with
         df1['Probability'] = df1[parameter].apply(
             lambda x: (df1.groupby(parameter)[parameter].count()[x]) / original_data.shape[0])
         df2 = pd.DataFrame()
-        df2[parameter] = data_without_restore[parameter]
-        df2['Data'] = 'Данные из сети с изучаемым узлом'
+        df2[parameter] = synthetic_data[parameter]
+        df2['Data'] = 'Синтетические данные'
         df2['Probability'] = df2[parameter].apply(
-            lambda x: (df2.groupby(parameter)[parameter].count()[x]) / data_without_restore.shape[0])
-        df3 = pd.DataFrame()
-        df3[parameter] = data_with_restore[parameter]
-        df3['Data'] = 'Данные из сети без изучаемого узла'
-        df3['Probability'] = df3[parameter].apply(
-            lambda x: (df3.groupby(parameter)[parameter].count()[x]) / data_with_restore.shape[0])
-        final_df = pd.concat([df1, df2, df3])
+            lambda x: (df2.groupby(parameter)[parameter].count()[x]) / synthetic_data.shape[0])
+        # df3 = pd.DataFrame()
+        # df3[parameter] = data_with_restore[parameter]
+        # df3['Data'] = 'Данные из сети без изучаемого узла'
+        # df3['Probability'] = df3[parameter].apply(
+        #     lambda x: (df3.groupby(parameter)[parameter].count()[x]) / data_with_restore.shape[0])
+        final_df = pd.concat([df1, df2])
         ax = sns.barplot(x=parameter, y="Probability", hue="Data", data=final_df)
+        ax.xaxis.set_tick_params(rotation=45)
     else:
         ax = sns.distplot(original_data[parameter], hist=False, label='Исходные данные')
-        ax = sns.distplot(data_without_restore[parameter], hist=False, label='Данные из сети с изучаемым узлом')
-        ax = sns.distplot(data_with_restore[parameter], hist=False, label='Данные из сети без изучаемого узла')
+        ax = sns.distplot(synthetic_data[parameter], hist=False, label='Синтетические данные')
+        #ax = sns.distplot(data_with_restore[parameter], hist=False, label='Данные из сети без изучаемого узла')
+        ax.xaxis.set_tick_params(rotation=45)
         ax.legend()
 
     # ax.set_xticks(range(0, original_data[parameter].nunique(), 5))
