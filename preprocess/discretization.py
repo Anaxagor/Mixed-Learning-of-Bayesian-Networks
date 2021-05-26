@@ -1,8 +1,34 @@
 from copy import copy
-
 import pandas as pd
 from sklearn import preprocessing
 from sklearn.preprocessing import KBinsDiscretizer
+
+
+
+def get_nodes_sign(data: pd.DataFrame) -> dict:
+    """Function to define sign of the node
+       neg - if node has negative values
+       pos - if node has only positive values
+
+    Args:
+        data (pd.DataFrame): input dataset
+
+    Returns:
+        dict: output dictionary where 'key' - node name and 'value' - sign of data
+    """    
+    nodes_types = get_nodes_type(data)
+    columns_sign = dict()
+    for c in data.columns.to_list():
+        if nodes_types[c] == 'cont':
+            if (data[c] < 0).any():
+                columns_sign[c] = 'neg'
+            else:
+                columns_sign[c] = 'pos'
+    return columns_sign
+
+
+
+
 
 
 def get_nodes_type(data: pd.DataFrame) -> dict:
