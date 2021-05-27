@@ -37,9 +37,6 @@ from fedot.core.composer.optimisers.gp_comp.gp_optimiser import (
 from fedot.core.composer.optimisers.gp_comp.operators.mutation import MutationTypesEnum
 from fedot.core.log import default_log
 
-from sklearn.svm import SVR
-from sklearn.cluster import KMeans
-
 
 
 
@@ -272,45 +269,6 @@ def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = da
 
     return optimized_network
 
-
-
-# def run_BN_evo_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
-#     available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-#     composer_requirements = GPComposerRequirements(
-#             primary=available_nodes,
-#             secondary=available_nodes, max_arity=6,
-#             max_depth=3, pop_size=20, num_of_generations=50,
-#             crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
-#     scheme_type = GeneticSchemeTypesEnum.steady_state
-#     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
-#     task = Task(TaskTypesEnum.regression)
-#     builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(K2).with_optimiser_parameters(optimiser_parameters)
-#     composer = builder.build()
-#     chain_evo_composed = composer.compose_chain(data=data)
-#     return chain_evo_composed
-
-
-# def run_BN_evo_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
-#     available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-#     composer_requirements = GPComposerRequirements(
-#             primary=available_nodes,
-#             secondary=available_nodes, max_arity=6,
-#             max_depth=3, pop_size=20, num_of_generations=50,
-#             crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
-#     scheme_type = GeneticSchemeTypesEnum.steady_state
-#     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
-#     task = Task(TaskTypesEnum.regression)
-#     builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(MI).with_optimiser_parameters(optimiser_parameters)
-#     composer = builder.build()
-#     chain_evo_composed = composer.compose_chain(data=data)
-#     return chain_evo_composed
-    
-
-
-
-
-
-
 def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: dict, init_nodes: list = None,
                        white_list: list = None,
                        init_edges: list = None, remove_init_edges: bool = True, black_list: list = None) -> dict:
@@ -386,6 +344,8 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                                                          fixed_edges=init_edges)
             structure = [list(x) for x in list(best_model_K2Score.edges())]
             skeleton['E'] = structure
+
+
         if score == 'MI_mixed':
             hc_mi_mixed = HillClimbSearch(data, scoring_method=MIG(data=data))
             if init_edges == None:
@@ -425,8 +385,9 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                                                          fixed_edges=init_edges)
             structure = [list(x) for x in list(best_model_mi_mixed.edges())]
             skeleton['E'] = structure
-    if search == 'evo':
 
+
+    if search == 'evo':
         if score == "MI":
             chain = run_bayesian_MI(data, node_types = node_type)
             graph, labels = chain_as_nx_graph(chain)

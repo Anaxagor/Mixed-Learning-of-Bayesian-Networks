@@ -27,10 +27,6 @@ def get_nodes_sign(data: pd.DataFrame) -> dict:
     return columns_sign
 
 
-
-
-
-
 def get_nodes_type(data: pd.DataFrame) -> dict:
     """Function to define the type of the node
        disc - discrete node
