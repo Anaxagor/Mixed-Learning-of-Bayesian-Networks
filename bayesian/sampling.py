@@ -37,6 +37,9 @@ def generate_synthetics(bn: HyBayesianNetwork, sign: dict, n: int = 1000, eviden
             if (sign[c_keys] == 'pos'):
                 sample = sample.loc[sample[c_keys] >= 0]
         sample.reset_index(inplace=True, drop=True)
-    sample = sample.sample(n)
+    try:
+        sample = sample.sample(n)
+    except:
+        sample = sample
     sample.reset_index(inplace=True, drop=True)
     return sample

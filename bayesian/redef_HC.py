@@ -42,7 +42,6 @@ from external.pyBN.utils.graph import would_cause_cycle
 import matplotlib.pyplot as plt
 from external.pyBN.learning.structure.score.info_scores import info_score
 from preprocess.discretization import get_nodes_type
-
 from bayesian.mi_entropy_gauss import mi_gauss as mutual_information
 
 

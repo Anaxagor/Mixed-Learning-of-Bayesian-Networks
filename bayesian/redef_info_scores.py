@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from copy import copy
 import warnings
-
 from bayesian.mi_entropy_gauss import mi_gauss as mutual_information, entropy_all as entropy
 from preprocess.discretization import get_nodes_type, code_categories
 from preprocess.numpy_pandas import loc_to_DataFrame, get_type_numpy

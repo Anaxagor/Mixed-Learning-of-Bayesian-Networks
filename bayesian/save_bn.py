@@ -1,6 +1,5 @@
 import json
 import os
-
 from external.libpgm.graphskeleton import GraphSkeleton
 from external.libpgm.nodedata import NodeData
 from core.core_utils import project_root
