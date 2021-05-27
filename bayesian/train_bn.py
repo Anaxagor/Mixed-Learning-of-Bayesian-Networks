@@ -6,25 +6,21 @@ import numpy as np
 import pandas as pd
 from pgmpy.base import DAG
 from pgmpy.estimators import HillClimbSearch
-from pgmpy.estimators import K2Score
+from pgmpy.estimators import K2Score, PC
 from pomegranate import DiscreteDistribution, ConditionalProbabilityTable
 from scipy.stats import norm
 from sklearn import linear_model
 from bayesian.structure_score import MIG, LLG, BICG, AICG
 from sklearn.mixture import GaussianMixture
-#from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
 from bayesian.redef_HC import hc as hc_method
 from bayesian.redef_info_scores import info_score
 from bayesian.mi_entropy_gauss import mi
 import datetime
 import random
 from functools import partial
-from pathlib import Path
-
 from networkx.algorithms.cycles import simple_cycles
 from pgmpy.estimators import K2Score
 from pgmpy.models import BayesianModel
-
 from fedot.core.chains.chain_convert import chain_as_nx_graph
 from fedot.core.chains.chain_validation import has_no_self_cycled_nodes
 from fedot.core.chains.graph import GraphObject
@@ -269,7 +265,7 @@ def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = da
 
     return optimized_network
 
-def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: dict, init_nodes: list = None,
+def structure_learning(data: pd.DataFrame, search: str, node_type: dict, score: str = 'MI', init_nodes: list = None,
                        white_list: list = None,
                        init_edges: list = None, remove_init_edges: bool = True, black_list: list = None) -> dict:
     """Function for bayesian networks structure learning
@@ -411,6 +407,23 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
             for pair in graph.edges():
                 struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
             skeleton['E'] = struct
+
+    if search == 'PC':
+        pc_search = PC(data)
+        if init_edges == None:
+            best_model_pc = pc_search.estimate(black_list=blacklist, white_list=white_list)
+        else:
+            if remove_init_edges:
+                startdag = DAG()
+                startdag.add_nodes_from(nodes=datacol)
+                startdag.add_edges_from(ebunch=init_edges)
+                best_model_pc = pc_search.estimate(black_list=blacklist, white_list=white_list,
+                                                         start_dag=startdag)
+            else:
+                best_model_pc = pc_search.estimate(black_list=blacklist, white_list=white_list,
+                                                         fixed_edges=init_edges)
+        structure = [list(x) for x in list(best_model_pc.edges())]
+        skeleton['E'] = structure
 
     return skeleton
 
