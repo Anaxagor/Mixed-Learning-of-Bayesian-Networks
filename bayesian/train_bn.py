@@ -6,25 +6,21 @@ import numpy as np
 import pandas as pd
 from pgmpy.base import DAG
 from pgmpy.estimators import HillClimbSearch
-from pgmpy.estimators import K2Score
+from pgmpy.estimators import K2Score, PC
 from pomegranate import DiscreteDistribution, ConditionalProbabilityTable
 from scipy.stats import norm
 from sklearn import linear_model
 from bayesian.structure_score import MIG, LLG, BICG, AICG
 from sklearn.mixture import GaussianMixture
-#from external.pyBN.learning.structure.score.hill_climbing import hc as hc_method
 from bayesian.redef_HC import hc as hc_method
 from bayesian.redef_info_scores import info_score
 from bayesian.mi_entropy_gauss import mi
 import datetime
 import random
 from functools import partial
-from pathlib import Path
-
 from networkx.algorithms.cycles import simple_cycles
 from pgmpy.estimators import K2Score
 from pgmpy.models import BayesianModel
-
 from fedot.core.chains.chain_convert import chain_as_nx_graph
 from fedot.core.chains.chain_validation import has_no_self_cycled_nodes
 from fedot.core.chains.graph import GraphObject
@@ -38,6 +34,7 @@ from fedot.core.composer.optimisers.gp_comp.operators.mutation import MutationTy
 from fedot.core.composer.optimisers.gp_comp.operators.crossover import CrossoverTypesEnum
 from fedot.core.log import default_log
 
+<<<<<<< HEAD
 from sklearn.svm import SVR
 from sklearn.cluster import KMeans
 
@@ -50,6 +47,8 @@ from bayesian.metrics import acc_rmse_err
 from bayesian.calculate_accuracy import calculate_acc
 from external.libpgm.hybayesiannetwork import HyBayesianNetwork
 
+=======
+>>>>>>> 06a3a2f152e2a23c25bcb298adb8dbb9ddd6e4f8
 
 
 
@@ -373,46 +372,7 @@ def run_bayesian_acc(data: pd.DataFrame, node_types: dict, max_lead_time: dateti
 
     return optimized_network
 
-
-
-# def run_BN_evo_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
-#     available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-#     composer_requirements = GPComposerRequirements(
-#             primary=available_nodes,
-#             secondary=available_nodes, max_arity=6,
-#             max_depth=3, pop_size=20, num_of_generations=50,
-#             crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
-#     scheme_type = GeneticSchemeTypesEnum.steady_state
-#     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
-#     task = Task(TaskTypesEnum.regression)
-#     builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(K2).with_optimiser_parameters(optimiser_parameters)
-#     composer = builder.build()
-#     chain_evo_composed = composer.compose_chain(data=data)
-#     return chain_evo_composed
-
-
-# def run_BN_evo_MI(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), is_visualise=False, with_tuning=False) -> Chain: 
-#     available_nodes = ['Tectonic regime', 'Period', 'Lithology', 'Structural setting', 'Gross','Netpay','Porosity','Permeability', 'Depth']
-#     composer_requirements = GPComposerRequirements(
-#             primary=available_nodes,
-#             secondary=available_nodes, max_arity=6,
-#             max_depth=3, pop_size=20, num_of_generations=50,
-#             crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time, add_single_model_chains=False)
-#     scheme_type = GeneticSchemeTypesEnum.steady_state
-#     optimiser_parameters = GPChainOptimiserParameters(genetic_scheme_type=scheme_type)
-#     task = Task(TaskTypesEnum.regression)
-#     builder = GPComposerBuilder(task).with_requirements(composer_requirements).with_metrics(MI).with_optimiser_parameters(optimiser_parameters)
-#     composer = builder.build()
-#     chain_evo_composed = composer.compose_chain(data=data)
-#     return chain_evo_composed
-    
-
-
-
-
-
-
-def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: dict, init_nodes: list = None,
+def structure_learning(data: pd.DataFrame, search: str, node_type: dict, score: str = 'MI', init_nodes: list = None,
                        white_list: list = None,
                        init_edges: list = None, remove_init_edges: bool = True, black_list: list = None) -> dict:
     """Function for bayesian networks structure learning
@@ -487,6 +447,8 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                                                          fixed_edges=init_edges)
             structure = [list(x) for x in list(best_model_K2Score.edges())]
             skeleton['E'] = structure
+
+
         if score == 'MI_mixed':
             hc_mi_mixed = HillClimbSearch(data, scoring_method=MIG(data=data))
             if init_edges == None:
@@ -526,8 +488,9 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
                                                          fixed_edges=init_edges)
             structure = [list(x) for x in list(best_model_mi_mixed.edges())]
             skeleton['E'] = structure
-    if search == 'evo':
 
+
+    if search == 'evo':
         if score == "MI":
             chain = run_bayesian_MI(data, node_types = node_type)
             graph, labels = chain_as_nx_graph(chain)
@@ -559,6 +522,23 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
             for pair in graph.edges():
                 struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
             skeleton['E'] = struct
+
+    if search == 'PC':
+        pc_search = PC(data)
+        if init_edges == None:
+            best_model_pc = pc_search.estimate(black_list=blacklist, white_list=white_list)
+        else:
+            if remove_init_edges:
+                startdag = DAG()
+                startdag.add_nodes_from(nodes=datacol)
+                startdag.add_edges_from(ebunch=init_edges)
+                best_model_pc = pc_search.estimate(black_list=blacklist, white_list=white_list,
+                                                         start_dag=startdag)
+            else:
+                best_model_pc = pc_search.estimate(black_list=blacklist, white_list=white_list,
+                                                         fixed_edges=init_edges)
+        structure = [list(x) for x in list(best_model_pc.edges())]
+        skeleton['E'] = structure
 
     return skeleton
 

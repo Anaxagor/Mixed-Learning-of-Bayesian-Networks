@@ -1,4 +1,0 @@
-verison: 1
-loggers:
-  my_module:
-    level: "ERROR"

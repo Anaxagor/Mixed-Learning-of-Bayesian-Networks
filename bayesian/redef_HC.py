@@ -25,29 +25,16 @@ Strategies to improve Greedy Hill-Climbing:
     and say that the search cannt reverse (undo) any
     of these steps.
 """
-# import os,sys,inspect
-# currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-# parentdir = os.path.dirname(currentdir)
-# sys.path.insert(0,parentdir)
-
-#from scipy.optimize import *
-import numpy as np
-import pandas as pd
-#from heapq import *
-from copy import copy, deepcopy
 
 from external.pyBN.classes.bayesnet import BayesNet
-from external.pyBN.learning.parameter.mle import mle_estimator
 from external.pyBN.utils.graph import would_cause_cycle
 import matplotlib.pyplot as plt
-from external.pyBN.learning.structure.score.info_scores import info_score
-from preprocess.discretization import get_nodes_type
-
-from bayesian.mi_entropy_gauss import mi_gauss as mutual_information
+from bayesian.redef_info_scores import log_lik_local, BIC_local, AIC_local
+from bayesian.mi_entropy_gauss import mi_gauss 
 
 
 
-def hc(data, metric='MI', max_iter=100, debug=False, init_nodes=None, restriction=None, init_edges=None, remove_geo_edges=True, black_list=None):
+def hc(data, metric='MI', max_iter=200, debug=False, init_nodes=None, restriction=None, init_edges=None, remove_geo_edges=True, black_list=None):
     """
     Greedy Hill Climbing search proceeds by choosing the move
     which maximizes the increase in fitness of the
@@ -124,25 +111,16 @@ def hc(data, metric='MI', max_iter=100, debug=False, init_nodes=None, restrictio
             c_dict[edge[0]].append(edge[1])
             p_dict[edge[1]].append(edge[0])
 
-    # COMPUTE INITIAL LIKELIHOOD SCORE	
     
     bn = BayesNet(c_dict)
-    columns = data.columns
-    node_type = get_nodes_type(data)
-    columns_for_discrete = []
-    for param in columns:
-        if node_type[param] == 'cont':
-            columns_for_discrete.append(param)
-    columns_for_code = []
-    for param in columns:
-        if node_type[param] == 'disc':
-            columns_for_code.append(param) 
     
-    
-    
-    
-    #mle_estimator(bn, data_discreted.values)
-    #max_score = info_score(bn, data_discreted.values, metric)
+    mutual_information = mi_gauss
+    if metric == 'BIC':
+        mutual_information = BIC_local
+    if metric == 'AIC':
+        mutual_information = AIC_local
+    if metric == 'LL':
+        mutual_information = log_lik_local
 
     data = data.values
 
