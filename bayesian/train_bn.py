@@ -35,10 +35,20 @@ from fedot.core.composer.optimisers.gp_comp.gp_optimiser import (
     GPChainOptimiserParameters,
     GeneticSchemeTypesEnum)
 from fedot.core.composer.optimisers.gp_comp.operators.mutation import MutationTypesEnum
+from fedot.core.composer.optimisers.gp_comp.operators.crossover import CrossoverTypesEnum
 from fedot.core.log import default_log
 
 from sklearn.svm import SVR
 from sklearn.cluster import KMeans
+
+from sklearn.model_selection import train_test_split
+
+from preprocess.discretization import get_nodes_type
+from bayesian.save_bn import save_structure, save_params, read_structure, read_params
+
+from bayesian.metrics import acc_rmse_err
+from bayesian.calculate_accuracy import calculate_acc
+from external.libpgm.hybayesiannetwork import HyBayesianNetwork
 
 
 
@@ -47,6 +57,25 @@ from sklearn.cluster import KMeans
 random.seed(1)
 np.random.seed(1)
 
+def acc_score(edges: list, data: pd.DataFrame, node_types: dict):
+    skeleton = dict()
+    skeleton['V'] = list(data.columns)
+    skeleton['E'] = edges
+    
+
+    train, test = train_test_split(data, test_size=0.1)
+    train.reset_index(inplace=True, drop=True)
+    test.reset_index(inplace=True, drop=True)
+    params = parameter_learning(train, node_types, skeleton)
+
+    save_structure(skeleton, 'curr_net')
+    skel = read_structure('curr_net')
+    save_params(params, 'curr_net_param')
+    params = read_params('curr_net_param')
+    bn = HyBayesianNetwork(skel, params)
+
+    acc, rmse, real_data, pred_data = calculate_acc(bn, test, skeleton['V'], 'nrmse')
+    return acc_rmse_err(acc, rmse)
 
 def k2_metric(network: GraphObject, data: pd.DataFrame):
     nodes = data.columns.to_list()
@@ -141,7 +170,7 @@ def mi_metric(network: GraphObject, data: pd.DataFrame):
     #score = mi(struct, data) - 10*(2*(len(struct)) / ((len(nodes) - 1)*len(nodes)))#+ 100*(len(no_nodes) / len(nodes))
     return [score]
 
-def info_metric(network: GraphObject, data: pd.DataFrame, method='LL'):
+def info_metric(network: GraphObject, data: pd.DataFrame, method='BIC'):
     nodes = data.columns.to_list()
     graph, labels = chain_as_nx_graph(network)
     struct = []
@@ -156,6 +185,21 @@ def info_metric(network: GraphObject, data: pd.DataFrame, method='LL'):
     score = info_score(struct, data, method) #+ 100*(len(no_nodes) / len(nodes))
     return [score]
 
+def acc_metric(network: GraphObject, data: pd.DataFrame, node_types: dict):
+    nodes = data.columns.to_list()
+    graph, labels = chain_as_nx_graph(network)
+    node_types = get_nodes_type(data)
+    struct = []
+    for pair in graph.edges():
+        struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+    # no_nodes = []
+    # for node in nodes:
+    #     if node not in bn_model.nodes():
+    #         no_nodes.append(node)
+
+    #return [random.random()]
+    score = acc_score(struct, data, node_types) #+ 100*(len(no_nodes) / len(nodes))
+    return [score]
 
 def run_bayesian_K2(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5)):
     #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
@@ -205,9 +249,9 @@ def run_bayesian_MI(data: pd.DataFrame,  node_types: dict, max_lead_time: dateti
 
     requirements = GPComposerRequirements(
         primary=nodes_types,
-        secondary=nodes_types, max_arity=4,
-        max_depth=3, pop_size=50, num_of_generations=30,
-        crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
+        secondary=nodes_types, min_arity=0, max_arity=4,
+        max_depth=10, pop_size=200, num_of_generations=10,
+        crossover_prob=0.2, mutation_prob=0.9, max_lead_time=max_lead_time)
 
     optimiser_parameters = GPChainOptimiserParameters(
         genetic_scheme_type=GeneticSchemeTypesEnum.steady_state,
@@ -215,7 +259,14 @@ def run_bayesian_MI(data: pd.DataFrame,  node_types: dict, max_lead_time: dateti
             MutationTypesEnum.simple,
             MutationTypesEnum.reduce,
             MutationTypesEnum.growth,
-            MutationTypesEnum.local_growth])
+            MutationTypesEnum.local_growth,
+            MutationTypesEnum.simple_add_edge,
+            MutationTypesEnum.add_edge,
+            MutationTypesEnum.simple_del_edge,
+            MutationTypesEnum.del_edge,
+            MutationTypesEnum.simple_inv_edge,
+            MutationTypesEnum.inv_edge],
+        crossover_types = [CrossoverTypesEnum.none])
 
     chain_generation_params = ChainGenerationParams(
         chain_class=GraphObject,
@@ -234,17 +285,17 @@ def run_bayesian_MI(data: pd.DataFrame,  node_types: dict, max_lead_time: dateti
 
     return optimized_network
 
-def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=5), method = 'LL'):
+def run_bayesian_info(data: pd.DataFrame, node_types: dict, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=15), method = 'BIC'):
     #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
     nodes_types = data.columns.to_list()
-    global node_types
-    node_types = get_nodes_type(data)
+    global node_type
+    node_type = copy(node_types)
     rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
 
     requirements = GPComposerRequirements(
         primary=nodes_types,
         secondary=nodes_types, max_arity=5,
-        max_depth=3, pop_size=50, num_of_generations=30,
+        max_depth=10, pop_size=200, num_of_generations=30,
         crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
 
     optimiser_parameters = GPChainOptimiserParameters(
@@ -253,7 +304,14 @@ def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = da
             MutationTypesEnum.simple,
             MutationTypesEnum.reduce,
             MutationTypesEnum.growth,
-            MutationTypesEnum.local_growth])
+            MutationTypesEnum.local_growth,
+            MutationTypesEnum.simple_add_edge,
+            MutationTypesEnum.add_edge,
+            MutationTypesEnum.simple_del_edge,
+            MutationTypesEnum.del_edge,
+            MutationTypesEnum.simple_inv_edge,
+            MutationTypesEnum.inv_edge],
+            crossover_types = [CrossoverTypesEnum.none])
 
     chain_generation_params = ChainGenerationParams(
         chain_class=GraphObject,
@@ -267,8 +325,51 @@ def run_bayesian_info(data: pd.DataFrame, max_lead_time: datetime.timedelta = da
         parameters=optimiser_parameters,
         requirements=requirements, initial_chain=None,
         log=default_log(logger_name='Bayesian', verbose_level=4))
+    optimized_network = optimizer.optimise(partial(info_metric, data=data, method=method))
 
-    optimized_network = optimizer.optimise(partial(info_metric, data=data))
+    return optimized_network
+
+def run_bayesian_acc(data: pd.DataFrame, node_types: dict, max_lead_time: datetime.timedelta = datetime.timedelta(minutes=30)):
+    #data = pd.read_csv(f'{project_root()}\\data\\geo_encoded.csv')
+    nodes_types = data.columns.to_list()
+    global node_type
+    node_type = copy(node_types)
+    rules = [has_no_self_cycled_nodes, _has_no_cycle, _has_no_duplicates, _has_disc_parents]
+
+    requirements = GPComposerRequirements(
+        primary=nodes_types,
+        secondary=nodes_types, max_arity=5,
+        max_depth=4, pop_size=50, num_of_generations=30,
+        crossover_prob=0.8, mutation_prob=0.9, max_lead_time=max_lead_time)
+
+    optimiser_parameters = GPChainOptimiserParameters(
+        genetic_scheme_type=GeneticSchemeTypesEnum.steady_state,
+        mutation_types=[
+            MutationTypesEnum.simple,
+            MutationTypesEnum.reduce,
+            MutationTypesEnum.growth,
+            MutationTypesEnum.local_growth,
+            MutationTypesEnum.simple_add_edge,
+            MutationTypesEnum.add_edge,
+            MutationTypesEnum.simple_del_edge,
+            MutationTypesEnum.del_edge,
+            MutationTypesEnum.simple_inv_edge,
+            MutationTypesEnum.inv_edge],
+            crossover_types = [CrossoverTypesEnum.none])
+
+    chain_generation_params = ChainGenerationParams(
+        chain_class=GraphObject,
+        primary_node_func=PrimaryGraphNode,
+        secondary_node_func=SecondaryGraphNode,
+        rules_for_constraint=rules)
+
+    optimizer = GPChainOptimiser(
+        chain_generation_params=chain_generation_params,
+        metrics=[],
+        parameters=optimiser_parameters,
+        requirements=requirements, initial_chain=None,
+        log=default_log(logger_name='Bayesian', verbose_level=4))
+    optimized_network = optimizer.optimise(partial(acc_metric, data=data, node_types=node_types))
 
     return optimized_network
 
@@ -434,6 +535,14 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
             for pair in graph.edges():
                 struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
             skeleton['E'] = struct
+
+        if score == "acc":
+            chain = run_bayesian_acc(data, node_types = node_type)
+            graph, labels = chain_as_nx_graph(chain)
+            struct = []
+            for pair in graph.edges():
+                struct.append([str(labels[pair[0]]), str(labels[pair[1]])])
+            skeleton['E'] = struct
        
         if score == "K2":
             chain = run_bayesian_K2(data)
@@ -444,7 +553,7 @@ def structure_learning(data: pd.DataFrame, search: str, score: str, node_type: d
             skeleton['E'] = struct
 
         if (score == "LL") | (score == "BIC") | (score == "AIC"):
-            chain = run_bayesian_info(data, method = score)
+            chain = run_bayesian_info(data, node_types = node_type, method = score)
             graph, labels = chain_as_nx_graph(chain)
             struct = []
             for pair in graph.edges():
